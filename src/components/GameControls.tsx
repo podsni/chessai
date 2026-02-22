@@ -2,6 +2,11 @@ import { useState } from "react";
 import { Chess } from "chess.js";
 import { MiniBoard } from "./MiniBoard";
 import Skeleton, { SkeletonTheme } from "react-loading-skeleton";
+import {
+  getAiMoveDepthLimit,
+  getAnalysisDepthLimit,
+  getUiDepthLimit,
+} from "../utils/engineConstraints";
 import type {
   AIEngine,
   AnalysisEngineMode,
@@ -99,6 +104,9 @@ export function GameControls({
     safe: "Safe (Consensus)",
     both: "Dual Engines",
   };
+  const uiDepthLimit = getUiDepthLimit(settings);
+  const aiMoveDepthLimit = getAiMoveDepthLimit(settings);
+  const analysisDepthLimit = getAnalysisDepthLimit(settings);
 
   const buildPredictionSteps = (fen: string, moves: string[], maxSteps = 4) => {
     const board = new Chess(fen);
@@ -479,7 +487,7 @@ export function GameControls({
                 <input
                   type="range"
                   min="1"
-                  max="15"
+                  max={uiDepthLimit}
                   value={settings.aiDepth}
                   onChange={(e) =>
                     onSettingsChange({ aiDepth: parseInt(e.target.value) })
@@ -490,9 +498,13 @@ export function GameControls({
                   className="text-xs"
                   style={{ color: "var(--text-light)" }}
                 >
-                  Strong (15)
+                  Strong ({uiDepthLimit})
                 </span>
               </div>
+              <p className="mt-2 text-[11px] text-gray-400">
+                Limit AI Move: {aiMoveDepthLimit} • Limit Analyze/Hint:{" "}
+                {analysisDepthLimit}
+              </p>
             </div>
 
             <div>

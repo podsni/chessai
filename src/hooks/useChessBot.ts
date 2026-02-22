@@ -6,6 +6,10 @@ import { ChessApiEngine } from "../services/chessApiEngine";
 import { soundManager } from "../services/soundManager";
 import { hapticManager } from "../services/hapticManager";
 import { gameStorage } from "../services/gameStorage";
+import {
+  getAiMoveDepthLimit,
+  getAnalysisDepthLimit,
+} from "../utils/engineConstraints";
 import type { PGNGameInfo } from "../services/pgnParser";
 import type {
   AIEngine,
@@ -342,6 +346,10 @@ export const useChessBot = (
   const handleAnalyzePosition = useCallback(async () => {
     setIsThinking(true);
     try {
+      const analysisDepth = Math.min(
+        settings.aiDepth,
+        getAnalysisDepthLimit(settings),
+      );
       const engines: AIEngine[] =
         settings.analysisEngineMode === "single"
           ? [settings.aiEngine]
@@ -351,7 +359,7 @@ export const useChessBot = (
         engines.map(async (engine) => {
           const result = await getSafeAnalysis(
             chess.fen(),
-            settings.aiDepth,
+            analysisDepth,
             engine,
           );
           return {
@@ -427,10 +435,19 @@ export const useChessBot = (
       const fallbackMessages = results
         .filter((r) => r.fallbackUsed)
         .map((r) => `${r.requestedEngine} -> ${r.engineUsed}`);
+      const depthNotice =
+        analysisDepth < settings.aiDepth
+          ? `Depth dibatasi ke ${analysisDepth} sesuai batas engine.`
+          : null;
       setEngineNotice(
-        fallbackMessages.length > 0
-          ? `Fallback aktif: ${fallbackMessages.join(", ")}`
-          : null,
+        [
+          depthNotice,
+          fallbackMessages.length > 0
+            ? `Fallback aktif: ${fallbackMessages.join(", ")}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" | ") || null,
       );
     } catch (error) {
       console.error("Error analyzing position:", error);
@@ -440,10 +457,7 @@ export const useChessBot = (
     }
   }, [
     chess,
-    settings.aiDepth,
-    settings.aiEngine,
-    settings.analysisEngineMode,
-    settings.showAnalysisArrows,
+    settings,
     createAnalysisArrows,
     getSafeAnalysis,
     pickSafeMove,
@@ -603,16 +617,27 @@ export const useChessBot = (
 
     setIsThinking(true);
     try {
+      const aiMoveDepth = Math.min(
+        settings.aiDepth,
+        getAiMoveDepthLimit(settings),
+      );
       const preferredEngine = getEngineForCurrentTurn();
       const { analysis, engineUsed, fallbackUsed } = await getSafeAnalysis(
         chess.fen(),
-        settings.aiDepth,
+        aiMoveDepth,
         preferredEngine,
       );
       setEngineNotice(
-        fallbackUsed
-          ? `Engine ${preferredEngine} bermasalah, fallback ke ${engineUsed}.`
-          : null,
+        [
+          aiMoveDepth < settings.aiDepth
+            ? `Depth dibatasi ke ${aiMoveDepth} sesuai batas engine.`
+            : null,
+          fallbackUsed
+            ? `Engine ${preferredEngine} bermasalah, fallback ke ${engineUsed}.`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" | ") || null,
       );
       const bestMove = analysis.bestmove
         ? engineClients[engineUsed].extractMoveFromString(analysis.bestmove)
@@ -629,9 +654,13 @@ export const useChessBot = (
           // Update analysis with bot move
           if (settings.autoAnalysis || settings.analysisMode) {
             const nextPreferredEngine = getEngineForCurrentTurn();
+            const nextAnalysisDepth = Math.min(
+              settings.aiDepth,
+              getAnalysisDepthLimit(settings),
+            );
             const nextAnalysis = await getSafeAnalysis(
               chess.fen(),
-              settings.aiDepth,
+              nextAnalysisDepth,
               nextPreferredEngine,
             );
             setAnalysis(nextAnalysis.analysis);
@@ -651,9 +680,7 @@ export const useChessBot = (
   }, [
     chess,
     moveHistory,
-    settings.aiDepth,
-    settings.autoAnalysis,
-    settings.analysisMode,
+    settings,
     updateGameState,
     createAnalysisArrows,
     getSafeAnalysis,
@@ -664,6 +691,10 @@ export const useChessBot = (
   const handleGetHint = useCallback(async () => {
     setIsThinking(true);
     try {
+      const analysisDepth = Math.min(
+        settings.aiDepth,
+        getAnalysisDepthLimit(settings),
+      );
       const engines: AIEngine[] =
         settings.analysisEngineMode === "single"
           ? [settings.aiEngine]
@@ -672,7 +703,7 @@ export const useChessBot = (
         engines.map(async (engine) => {
           const result = await getSafeAnalysis(
             chess.fen(),
-            settings.aiDepth,
+            analysisDepth,
             engine,
           );
           return { requestedEngine: engine, ...result };
@@ -745,10 +776,19 @@ export const useChessBot = (
       const fallbackMessages = results
         .filter((r) => r.fallbackUsed)
         .map((r) => `${r.requestedEngine} -> ${r.engineUsed}`);
+      const depthNotice =
+        analysisDepth < settings.aiDepth
+          ? `Depth dibatasi ke ${analysisDepth} sesuai batas engine.`
+          : null;
       setEngineNotice(
-        fallbackMessages.length > 0
-          ? `Fallback aktif: ${fallbackMessages.join(", ")}`
-          : null,
+        [
+          depthNotice,
+          fallbackMessages.length > 0
+            ? `Fallback aktif: ${fallbackMessages.join(", ")}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" | ") || null,
       );
     } catch (error) {
       console.error("Error getting hint:", error);
@@ -758,10 +798,7 @@ export const useChessBot = (
     }
   }, [
     chess,
-    settings.aiDepth,
-    settings.aiEngine,
-    settings.analysisEngineMode,
-    settings.showAnalysisArrows,
+    settings,
     createAnalysisArrows,
     getSafeAnalysis,
     parseMove,
@@ -860,7 +897,16 @@ export const useChessBot = (
 
   const handleSettingsChange = useCallback(
     (newSettings: Partial<GameSettings>) => {
-      setSettings((prev) => ({ ...prev, ...newSettings }));
+      setSettings((prev) => {
+        const merged = { ...prev, ...newSettings };
+        const uiDepthLimit = merged.analysisMode
+          ? getAnalysisDepthLimit(merged)
+          : getAiMoveDepthLimit(merged);
+        if (merged.aiDepth > uiDepthLimit) {
+          merged.aiDepth = uiDepthLimit;
+        }
+        return merged;
+      });
       setEngineNotice(null);
 
       // Clear arrows if analysis arrows are disabled

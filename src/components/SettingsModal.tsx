@@ -3,6 +3,7 @@ import { soundManager } from "../services/soundManager";
 import { hapticManager } from "../services/hapticManager";
 import { gameStorage } from "../services/gameStorage";
 import type { GameSettings } from "../types/chess";
+import { getUiDepthLimit } from "../utils/engineConstraints";
 
 type SettingsModalState = GameSettings & {
   soundEnabled: boolean;
@@ -32,12 +33,17 @@ export function SettingsModal({
   });
 
   if (!isOpen) return null;
+  const uiDepthLimit = getUiDepthLimit(localSettings);
 
   const handleSettingChange = <K extends keyof SettingsModalState>(
     key: K,
     value: SettingsModalState[K],
   ) => {
     const newSettings: SettingsModalState = { ...localSettings, [key]: value };
+    const depthLimit = getUiDepthLimit(newSettings);
+    if (newSettings.aiDepth > depthLimit) {
+      newSettings.aiDepth = depthLimit;
+    }
     setLocalSettings(newSettings);
 
     // Apply immediately for feedback settings
@@ -223,7 +229,7 @@ export function SettingsModal({
               <input
                 type="range"
                 min="1"
-                max="15"
+                max={uiDepthLimit}
                 value={localSettings.aiDepth}
                 onChange={(e) =>
                   handleSettingChange("aiDepth", parseInt(e.target.value))
@@ -233,7 +239,7 @@ export function SettingsModal({
               <div className="flex justify-between text-xs text-gray-400 mt-1">
                 <span>Fast (1)</span>
                 <span>Balanced (10)</span>
-                <span>Strong (15)</span>
+                <span>Strong ({uiDepthLimit})</span>
               </div>
             </div>
           </div>
