@@ -78,9 +78,9 @@ export function ChessBot({
       chess.turn() === settings.humanColor[0]);
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg-primary)" }}>
+    <div className="page-shell min-h-screen">
       {/* Header */}
-      <header className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 border-b border-gray-700 shadow-lg">
+      <header className="page-header border-b border-gray-700 shadow-lg">
         <div className="container mx-auto px-2 py-3 md:px-4 md:py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1 md:gap-3 flex-1 min-w-0">
@@ -181,11 +181,11 @@ export function ChessBot({
       )}
 
       {/* Main Content */}
-      <main className="container mx-auto px-2 py-4 md:px-4 md:py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+      <main className="page-main container mx-auto px-2 py-4 md:px-4 md:py-6">
+        <div className="dashboard-layout grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Chess Board - Takes up 2 columns on large screens */}
           <div className="lg:col-span-2 order-1 lg:order-1">
-            <div className="game-card p-4 md:p-6">
+            <div className="game-card board-panel p-4 md:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
                 <h2 className="text-lg md:text-xl font-semibold text-white flex items-center gap-2 flex-wrap">
                   <span>🏁</span>
@@ -396,7 +396,7 @@ export function ChessBot({
           </div>
 
           {/* Game Controls - Takes up 1 column */}
-          <div className="lg:col-span-1 order-2 lg:order-2">
+          <div className="lg:col-span-1 order-2 lg:order-2 controls-panel">
             <GameControls
               settings={settings}
               onSettingsChange={handleSettingsChange}
@@ -426,7 +426,7 @@ export function ChessBot({
       </main>
 
       {/* Footer */}
-      <footer className="bg-gray-900 border-t border-gray-700 mt-4 md:mt-12">
+      <footer className="page-footer border-t border-gray-700 mt-4 md:mt-12">
         <div className="container mx-auto px-2 py-3 md:px-4 md:py-6">
           <div className="text-center">
             <p className="text-gray-400 text-xs md:text-sm leading-relaxed">

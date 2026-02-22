@@ -73,14 +73,14 @@ export function GameControls({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="controls-stack space-y-4 lg:sticky lg:top-4">
       {/* Game Status */}
-      <div className="game-card p-4">
+      <div className="game-card control-section p-4">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           <h3 className="text-lg font-semibold text-white">Game Status</h3>
         </div>
-        <div className="status-indicator">
+        <div className={`status-indicator ${isThinking ? "thinking" : ""}`}>
           {isThinking ? "🤔 AI Thinking..." : gameStatus}
         </div>
 
@@ -100,7 +100,7 @@ export function GameControls({
 
       {/* AI Prediction Mini Board */}
       {(bestMove || hintMove) && (
-        <div className="game-card p-4">
+        <div className="game-card control-section p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="text-xl">🔮</span>
@@ -125,7 +125,6 @@ export function GameControls({
                   evaluation={evaluation}
                   mate={mate}
                   title="Best Move"
-                  size={180}
                   boardOrientation={boardOrientation}
                 />
               )}
@@ -137,7 +136,6 @@ export function GameControls({
                   evaluation={evaluation}
                   mate={mate}
                   title="Hint Move"
-                  size={180}
                   boardOrientation={boardOrientation}
                 />
               )}
@@ -153,7 +151,7 @@ export function GameControls({
       )}
 
       {/* Player Selection - New Game Setup */}
-      <div className="game-card p-4">
+      <div className="game-card control-section p-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xl">🎯</span>
           <h3 className="text-lg font-semibold text-white">Start New Game</h3>
@@ -182,7 +180,7 @@ export function GameControls({
       </div>
 
       {/* Game Mode Selection */}
-      <div className="game-card p-4">
+      <div className="game-card control-section p-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xl">🎮</span>
           <h3 className="text-lg font-semibold text-white">Game Mode</h3>
@@ -209,7 +207,7 @@ export function GameControls({
       </div>
 
       {/* Game Controls */}
-      <div className="game-card p-4">
+      <div className="game-card control-section p-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xl">⚡</span>
           <h3 className="text-lg font-semibold text-white">Game Controls</h3>
@@ -243,7 +241,7 @@ export function GameControls({
       </div>
 
       {/* Analysis Mode Toggle */}
-      <div className="game-card p-4">
+      <div className="game-card control-section p-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xl">🔬</span>
           <h3 className="text-lg font-semibold text-white">Analysis Mode</h3>
@@ -284,7 +282,7 @@ export function GameControls({
       </div>
 
       {/* AI Settings */}
-      <div className="game-card p-4">
+      <div className="game-card control-section p-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xl">⚙️</span>
           <h3 className="text-lg font-semibold text-white">AI Settings</h3>
@@ -359,7 +357,7 @@ export function GameControls({
       </div>
 
       {/* Analysis */}
-      <div className="game-card p-4">
+      <div className="game-card control-section p-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xl">🔍</span>
           <h3 className="text-lg font-semibold text-white">

@@ -780,6 +780,187 @@ body {
   background-color: rgba(239, 68, 68, 0.2) !important;
 }
 
+/* 2026 UI polish: cleaner hierarchy + mobile-first ergonomics */
+:root {
+  --bg-primary: #171613;
+  --bg-secondary: #201d19;
+  --surface-1: rgba(36, 33, 29, 0.92);
+  --surface-2: rgba(29, 27, 24, 0.94);
+  --surface-border: rgba(170, 145, 97, 0.22);
+  --text-light: #cfc9bb;
+  --text-white: #f5f1e8;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Poppins", "Avenir Next", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(
+      1200px 700px at -10% -20%,
+      rgba(127, 166, 80, 0.14),
+      transparent 60%
+    ),
+    radial-gradient(
+      1200px 700px at 110% 20%,
+      rgba(204, 142, 53, 0.12),
+      transparent 58%
+    ),
+    linear-gradient(180deg, #171613 0%, #141311 100%);
+}
+
+.page-shell {
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.02) 0%,
+    rgba(255, 255, 255, 0) 52%
+  );
+}
+
+.page-header {
+  background: linear-gradient(
+    120deg,
+    rgba(13, 12, 11, 0.92) 0%,
+    rgba(35, 32, 28, 0.9) 50%,
+    rgba(13, 12, 11, 0.92) 100%
+  );
+  backdrop-filter: blur(6px);
+}
+
+.page-main {
+  max-width: 1320px;
+}
+
+.page-footer {
+  background: linear-gradient(
+    180deg,
+    rgba(26, 24, 21, 0.82) 0%,
+    rgba(16, 15, 13, 0.94) 100%
+  );
+}
+
+.game-card {
+  background: linear-gradient(
+    160deg,
+    var(--surface-1) 0%,
+    var(--surface-2) 100%
+  );
+  border: 1px solid var(--surface-border);
+  border-radius: 14px;
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.board-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.board-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    420px 170px at 15% -15%,
+    rgba(127, 166, 80, 0.16),
+    transparent 66%
+  );
+}
+
+.controls-stack {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.control-section {
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.control-section:hover {
+  border-color: rgba(170, 145, 97, 0.35);
+  transform: translateY(-1px);
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.chess-button {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #8ebd55 0%, #6e9f3d 100%);
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  letter-spacing: 0.01em;
+}
+
+.chess-button.secondary {
+  background: linear-gradient(180deg, #626262 0%, #4f4f4f 100%);
+}
+
+.status-indicator {
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.analysis-panel {
+  border-radius: 10px;
+  background: linear-gradient(
+    160deg,
+    rgba(31, 30, 28, 0.96),
+    rgba(24, 23, 21, 0.96)
+  );
+}
+
+.chess-input {
+  border-radius: 10px;
+}
+
+@media (max-width: 1024px) {
+  .controls-panel {
+    position: static;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-main {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  .game-card {
+    border-radius: 12px;
+  }
+
+  .control-section:hover {
+    transform: none;
+  }
+
+  .chess-button {
+    min-height: 46px;
+    font-weight: 700;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header .container {
+    padding-top: 0.9rem;
+    padding-bottom: 0.9rem;
+  }
+
+  .game-card {
+    border-radius: 10px;
+  }
+
+  .status-indicator {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+}
+
 .tab-close-button:active {
   transform: scale(0.9);
 }
