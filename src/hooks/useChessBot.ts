@@ -276,6 +276,68 @@ export const useChessBot = (
     [buildPredictionLine],
   );
 
+  const pickSafeMove = useCallback(
+    (
+      results: Array<{
+        requestedEngine: AIEngine;
+        analysis: StockfishResponse;
+        engineUsed: AIEngine;
+      }>,
+      turn: "w" | "b",
+    ): string | null => {
+      const bestMoves = results
+        .map((r) =>
+          r.analysis.bestmove
+            ? engineClients[r.engineUsed].extractMoveFromString(
+                r.analysis.bestmove,
+              )
+            : null,
+        )
+        .filter((m): m is string => Boolean(m));
+
+      if (bestMoves.length === 0) return null;
+
+      // Consensus move is the safest option.
+      if (bestMoves.length >= 2 && bestMoves.every((m) => m === bestMoves[0])) {
+        return bestMoves[0];
+      }
+
+      // Try intersection from short prediction line.
+      const predictionSets = results.map(
+        (r) =>
+          new Set(buildPredictionLine(r.engineUsed, r.analysis).slice(0, 4)),
+      );
+      if (predictionSets.length >= 2) {
+        const first = predictionSets[0];
+        for (const candidate of first) {
+          if (predictionSets.every((set) => set.has(candidate))) {
+            return candidate;
+          }
+        }
+      }
+
+      // Fallback: choose move from engine with best eval for side to move.
+      const scored = results
+        .map((r) => {
+          const move = r.analysis.bestmove
+            ? engineClients[r.engineUsed].extractMoveFromString(
+                r.analysis.bestmove,
+              )
+            : null;
+          return {
+            move,
+            eval: r.analysis.evaluation ?? 0,
+          };
+        })
+        .filter((x): x is { move: string; eval: number } => Boolean(x.move));
+
+      if (scored.length === 0) return null;
+      scored.sort((a, b) => (turn === "w" ? b.eval - a.eval : a.eval - b.eval));
+      return scored[0].move;
+    },
+    [buildPredictionLine],
+  );
+
   const handleAnalyzePosition = useCallback(async () => {
     setIsThinking(true);
     try {
@@ -310,25 +372,38 @@ export const useChessBot = (
             "stockfish-online": "#7fb069",
             "chess-api": "#3b82f6",
           };
-          const arrows: AnalysisArrow[] = [];
-
-          for (const result of results) {
-            const bestMove = engineClients[
-              result.requestedEngine
-            ].extractMoveFromString(result.analysis.bestmove || "");
-            const parsed = bestMove ? parseMove(bestMove) : null;
-            if (parsed) {
-              arrows.push({
+          const parsedArrows = results
+            .map((result) => {
+              const bestMove = engineClients[
+                result.engineUsed
+              ].extractMoveFromString(result.analysis.bestmove || "");
+              const parsed = bestMove ? parseMove(bestMove) : null;
+              if (!parsed) return null;
+              return {
                 from: parsed.from,
                 to: parsed.to,
                 color: arrowColors[result.requestedEngine],
-              });
-            }
-          }
+              } as AnalysisArrow;
+            })
+            .filter((arrow): arrow is AnalysisArrow => Boolean(arrow));
+
+          const arrows: AnalysisArrow[] =
+            parsedArrows.length >= 2 &&
+            parsedArrows[0].from === parsedArrows[1].from &&
+            parsedArrows[0].to === parsedArrows[1].to
+              ? [
+                  {
+                    ...parsedArrows[0],
+                    color: "#facc15",
+                  },
+                ]
+              : parsedArrows;
           setAnalysisArrows(arrows);
         } else {
           setAnalysisArrows([]);
         }
+
+        setHintMove(pickSafeMove(results, chess.turn()));
 
         const fallbackMessages = results
           .filter((r) => r.fallbackUsed)
@@ -375,6 +450,7 @@ export const useChessBot = (
     createAnalysisArrows,
     getSafeAnalysis,
     getEngineForCurrentTurn,
+    pickSafeMove,
     parseMove,
     toEngineInsight,
   ]);

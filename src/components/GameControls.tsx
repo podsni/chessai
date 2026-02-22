@@ -158,6 +158,22 @@ export function GameControls({
               {engineNotice}
             </div>
           )}
+          {isAnalysisMode && (
+            <div className="mt-2 text-[11px] text-gray-300 flex flex-wrap gap-3">
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-[#7fb069]" />
+                Stockfish arrow
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-[#3b82f6]" />
+                Chess-API arrow
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-[#facc15]" />
+                Same move (consensus)
+              </span>
+            </div>
+          )}
         </div>
 
         {/* AI Prediction Mini Board */}
