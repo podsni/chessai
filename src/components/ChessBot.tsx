@@ -84,7 +84,9 @@ export function ChessBot({
         <div className="container mx-auto px-2 py-3 md:px-4 md:py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1 md:gap-3 flex-1 min-w-0">
-              <span className="text-xl md:text-4xl flex-shrink-0">♔</span>
+              <span className="text-xl md:text-4xl flex-shrink-0 hidden sm:inline">
+                ♔
+              </span>
               <div className="text-center md:text-left flex-1 min-w-0">
                 {tabId && onRename ? (
                   isRenaming ? (
@@ -135,12 +137,14 @@ export function ChessBot({
                   Chess AI • Touch Enabled
                 </p>
               </div>
-              <span className="text-xl md:text-4xl flex-shrink-0">♚</span>
+              <span className="text-xl md:text-4xl flex-shrink-0 hidden sm:inline">
+                ♚
+              </span>
             </div>
             <div className="flex gap-1 md:gap-2 ml-2 md:ml-4 flex-shrink-0">
               <button
                 onClick={() => setShowPgnModal(true)}
-                className="chess-button secondary p-2 md:p-2 text-xs md:text-sm touch-manipulation"
+                className="chess-button secondary header-action-btn p-2 md:p-2 text-xs md:text-sm touch-manipulation"
                 title="Load PGN Game"
               >
                 <span className="hidden md:inline">📝</span>
@@ -148,7 +152,7 @@ export function ChessBot({
               </button>
               <button
                 onClick={() => setShowSettings(true)}
-                className="chess-button secondary p-2 md:p-2 text-xs md:text-sm touch-manipulation"
+                className="chess-button secondary header-action-btn p-2 md:p-2 text-xs md:text-sm touch-manipulation"
                 title="Settings"
               >
                 <span className="hidden md:inline">⚙️</span>
@@ -191,23 +195,23 @@ export function ChessBot({
                   <span className="hidden sm:inline">Chess Board</span>
                   <span className="sm:hidden">Board</span>
                   {settings.analysisMode && (
-                    <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded">
+                    <span className="status-chip status-chip-blue">
                       ANALYSIS
                     </span>
                   )}
                   {arePiecesDraggable && (
-                    <span className="px-2 py-1 bg-green-600 text-white text-xs rounded">
+                    <span className="status-chip status-chip-green">
                       DRAG & DROP
                     </span>
                   )}
                   {isMobile && (
-                    <span className="px-2 py-1 bg-purple-600 text-white text-xs rounded">
+                    <span className="status-chip status-chip-purple">
                       MOBILE
                     </span>
                   )}
                 </h2>
                 <div
-                  className="flex items-center gap-2 text-xs md:text-sm"
+                  className="flex items-center gap-2 text-xs md:text-sm flex-wrap"
                   style={{ color: "var(--text-light)" }}
                 >
                   <div className="flex items-center gap-2">
@@ -250,7 +254,7 @@ export function ChessBot({
               />
 
               {/* Quick Actions */}
-              <div className="mt-4 flex flex-wrap gap-2 justify-center">
+              <div className="mt-4 flex flex-wrap gap-2 justify-center action-row-mobile">
                 <button
                   onClick={handleGetHint}
                   className={`chess-button flex-1 sm:flex-none min-h-[44px] touch-manipulation ${isThinking ? "pulse" : ""}`}

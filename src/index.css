@@ -1152,3 +1152,88 @@ html {
     padding-right: max(0.5rem, env(safe-area-inset-right));
   }
 }
+
+/* Mobile visual polish overrides */
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.22rem 0.62rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+}
+
+.status-chip-green {
+  color: #d8ffe4;
+  background: linear-gradient(180deg, #179f55, #118447);
+  border-color: rgba(120, 255, 173, 0.34);
+}
+
+.status-chip-blue {
+  color: #d9e8ff;
+  background: linear-gradient(180deg, #375dd9, #2b4cc2);
+  border-color: rgba(144, 182, 255, 0.34);
+}
+
+.status-chip-purple {
+  color: #f4dcff;
+  background: linear-gradient(180deg, #9440dc, #7f2ecb);
+  border-color: rgba(220, 174, 255, 0.3);
+}
+
+@media (max-width: 768px) {
+  .tab-container {
+    gap: 0.4rem;
+    padding-top: 0.1rem;
+    padding-bottom: 0.1rem;
+  }
+
+  .tab-item {
+    border-radius: 10px;
+    padding: 0.52rem 0.58rem;
+    min-height: 38px;
+  }
+
+  .header-action-btn {
+    min-width: 48px;
+    min-height: 40px;
+    border-radius: 10px;
+    padding: 0.4rem 0.6rem;
+  }
+
+  .status-chip {
+    font-size: 0.6rem;
+    padding: 0.18rem 0.52rem;
+  }
+
+  .board-panel > div:first-child {
+    gap: 0.55rem;
+    margin-bottom: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header .container {
+    padding-left: 0.6rem !important;
+    padding-right: 0.6rem !important;
+  }
+
+  .action-row-mobile {
+    gap: 0.45rem;
+  }
+
+  .action-row-mobile .chess-button {
+    flex: 1 1 calc(50% - 0.45rem);
+    min-width: 0;
+    font-size: 0.79rem;
+    padding: 0.52rem 0.4rem;
+  }
+
+  .tab-item {
+    min-width: 70px !important;
+    max-width: 96px !important;
+  }
+}

@@ -59,6 +59,11 @@ const cloneGameState = (gameState: PersistedGameState): PersistedGameState => ({
   lastMove: gameState.lastMove,
 });
 
+const buildCopyName = (name: string): string => {
+  const baseName = name.replace(/\s+Copy(?:\s+\d+)?$/i, "").trim();
+  return `${baseName} Copy`;
+};
+
 const isSameGameState = (
   prev: PersistedGameState,
   next: PersistedGameState,
@@ -176,7 +181,7 @@ export const useTabsStore = create<TabsStore>((set, get) => ({
         {
           ...sourceTab,
           id: newId,
-          name: `${sourceTab.name} Copy`,
+          name: buildCopyName(sourceTab.name),
           gameState: cloneGameState(sourceTab.gameState),
           timestamp: Date.now(),
         },
