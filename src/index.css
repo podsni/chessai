@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 /* Chess.com inspired color scheme */
 :root {
   --board-light: #f0d9b5;
@@ -23,6 +29,7 @@ body {
   color: var(--text-light);
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
 }
 
 /* React Chessboard container styling */
@@ -32,6 +39,8 @@ body {
   align-items: center;
   padding: 0.5rem;
   width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 /* Override react-chessboard styles for better chess.com look */
@@ -468,6 +477,7 @@ body {
   .container {
     padding-left: 0.75rem !important;
     padding-right: 0.75rem !important;
+    max-width: 100%;
   }
 
   header h1 {
@@ -476,11 +486,14 @@ body {
 
   .chess-board-container [data-testid="chessboard"] {
     max-width: 98vw !important;
+    margin: 0 auto !important;
   }
 
   .game-card {
     padding: 0.75rem !important;
     margin-bottom: 1rem;
+    width: 100%;
+    max-width: 100%;
   }
 
   .chess-button {
@@ -815,6 +828,8 @@ body {
     rgba(255, 255, 255, 0.02) 0%,
     rgba(255, 255, 255, 0) 52%
   );
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .page-header {
@@ -829,28 +844,13 @@ body {
 
 .page-main {
   max-width: 1320px;
+  padding-top: 0.25rem;
 }
 
-.hero-strip {
-  position: relative;
-}
-
-.hero-card {
-  box-shadow:
-    0 8px 26px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-.hero-image {
-  filter: saturate(1.05) contrast(1.02);
-}
-
-.hero-overlay {
-  background: linear-gradient(
-    180deg,
-    rgba(11, 10, 8, 0.2) 0%,
-    rgba(11, 10, 8, 0.72) 70%
-  );
+.dashboard-layout {
+  align-items: start;
+  width: 100%;
+  max-width: 100%;
 }
 
 .page-footer {
@@ -893,10 +893,6 @@ body {
 
 .controls-stack {
   padding-bottom: env(safe-area-inset-bottom);
-}
-
-.control-hero {
-  border-color: rgba(170, 145, 97, 0.3);
 }
 
 .control-section {
@@ -954,11 +950,8 @@ body {
 
 @media (max-width: 768px) {
   .page-main {
+    padding-top: 0;
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
-  }
-
-  .hero-card {
-    border-radius: 12px;
   }
 
   .game-card {
@@ -1100,6 +1093,7 @@ body {
   .container {
     padding-left: 0.5rem;
     padding-right: 0.5rem;
+    max-width: 100%;
   }
 
   .chess-board-container {
@@ -1107,8 +1101,19 @@ body {
   }
 
   .game-card {
-    margin: 0.5rem;
+    margin: 0;
     padding: 1rem;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .dashboard-layout > * {
+    min-width: 0;
+  }
+
+  .controls-stack {
+    width: 100%;
+    max-width: 100%;
   }
 }
 
@@ -1141,6 +1146,7 @@ body {
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 /* Safe area insets for mobile devices */

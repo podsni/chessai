@@ -1,6 +1,6 @@
 import { Chessboard } from "react-chessboard";
 import { Chess, Square } from "chess.js";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AnalysisArrow as AnalysisArrowType } from "../types/chess";
 
 interface ChessBoardProps {
@@ -33,6 +33,7 @@ export function ChessBoard({
   const [boardSize, setBoardSize] = useState(400);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [lastTouchTime, setLastTouchTime] = useState(0);
+  const boardContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Detect touch device
   useEffect(() => {
@@ -42,49 +43,68 @@ export function ChessBoard({
     setIsTouchDevice(checkTouchDevice());
   }, []);
 
-  // Calculate responsive board size with improved mobile handling
+  // Calculate responsive board size based on viewport and actual container width.
+  // This prevents board clipping on narrow mobile screens.
   useEffect(() => {
     const calculateBoardSize = () => {
       const screenWidth = window.innerWidth;
       const screenHeight = window.innerHeight;
+      const containerWidth =
+        boardContainerRef.current?.clientWidth || screenWidth;
       const isLandscape = screenWidth > screenHeight;
+      const availableWidth = Math.max(220, containerWidth - 12);
+
+      let idealSize = 400;
 
       // Mobile portrait (very small)
       if (screenWidth < 480) {
         if (isLandscape) {
           // Mobile landscape - use more of the height
-          return Math.min(screenHeight * 0.85, screenWidth * 0.45, 380);
+          idealSize = Math.min(screenHeight * 0.82, screenWidth * 0.45, 360);
         } else {
           // Mobile portrait - use most of the width
-          return Math.min(screenWidth * 0.92, 360);
+          idealSize = Math.min(screenWidth * 0.88, 340);
         }
       }
       // Mobile landscape or small tablet
       else if (screenWidth < 768) {
         if (isLandscape) {
-          return Math.min(screenHeight * 0.8, screenWidth * 0.5, 450);
+          idealSize = Math.min(screenHeight * 0.78, screenWidth * 0.5, 430);
         } else {
-          return Math.min(screenWidth * 0.85, 420);
+          idealSize = Math.min(screenWidth * 0.82, 410);
         }
       }
       // Tablet
       else if (screenWidth < 1024) {
-        return Math.min(screenWidth * 0.5, screenHeight * 0.65, 520);
+        idealSize = Math.min(screenWidth * 0.5, screenHeight * 0.65, 520);
       }
       // Desktop
       else {
-        return Math.min(screenWidth * 0.4, 600);
+        idealSize = Math.min(screenWidth * 0.4, 600);
       }
+
+      return Math.floor(Math.min(idealSize, availableWidth));
     };
 
-    setBoardSize(calculateBoardSize());
-
-    const handleResize = () => {
+    const updateBoardSize = () => {
       setBoardSize(calculateBoardSize());
     };
+    updateBoardSize();
+
+    const handleResize = () => updateBoardSize();
+    let resizeObserver: ResizeObserver | null = null;
+    if (boardContainerRef.current && "ResizeObserver" in window) {
+      resizeObserver = new ResizeObserver(updateBoardSize);
+      resizeObserver.observe(boardContainerRef.current);
+    }
 
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
   }, []);
 
   // Convert our analysis arrows to react-chessboard format
@@ -281,7 +301,10 @@ export function ChessBoard({
       )}
 
       {/* React Chessboard */}
-      <div className="chess-board-container w-full flex justify-center">
+      <div
+        ref={boardContainerRef}
+        className="chess-board-container w-full flex justify-center"
+      >
         <Chessboard
           id="chess-board"
           position={chess.fen()}

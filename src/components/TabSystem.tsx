@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Chess } from "chess.js";
 import { ChessBot } from "./ChessBot";
 import type { GameSettings, PersistedGameState } from "../types/chess";
@@ -19,16 +19,38 @@ export function TabSystem() {
     tabId: string;
   } | null>(null);
   const TABS_STORAGE_KEY = "chessbot-tabs";
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Save tabs to localStorage whenever tabs change
+  const cloneGameState = useCallback(
+    (gameState: PersistedGameState): PersistedGameState => ({
+      fen: gameState.fen,
+      pgn: gameState.pgn,
+      moveHistory: [...gameState.moveHistory],
+      settings: { ...gameState.settings },
+      lastMove: gameState.lastMove,
+    }),
+    [],
+  );
+
+  // Save tabs to localStorage with a small debounce to reduce UI jank
   useEffect(() => {
     if (tabs.length > 0) {
-      try {
-        localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(tabs));
-      } catch (error) {
-        console.error("Error saving tabs:", error);
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
       }
+      saveTimeoutRef.current = setTimeout(() => {
+        try {
+          localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(tabs));
+        } catch (error) {
+          console.error("Error saving tabs:", error);
+        }
+      }, 120);
     }
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
   }, [tabs]);
 
   // Close context menu when clicking outside
@@ -157,6 +179,28 @@ export function TabSystem() {
     }
   }, []);
 
+  const duplicateTab = useCallback(
+    (sourceTabId: string) => {
+      setTabs((prev) => {
+        const sourceTab = prev.find((tab) => tab.id === sourceTabId);
+        if (!sourceTab) return prev;
+
+        const newId = generateTabId();
+        const duplicate: ChessTab = {
+          ...sourceTab,
+          id: newId,
+          name: `${sourceTab.name} Copy`,
+          gameState: cloneGameState(sourceTab.gameState),
+          timestamp: Date.now(),
+        };
+
+        setActiveTabId(newId);
+        return [...prev, duplicate];
+      });
+    },
+    [generateTabId, cloneGameState],
+  );
+
   const renameTab = useCallback((tabId: string, newName: string) => {
     setTabs((prev) =>
       prev.map((tab) => (tab.id === tabId ? { ...tab, name: newName } : tab)),
@@ -201,17 +245,28 @@ export function TabSystem() {
       // Ctrl+Tab to switch to next tab
       else if (e.ctrlKey && e.key === "Tab") {
         e.preventDefault();
+        if (tabs.length === 0) return;
         const currentIndex = tabs.findIndex((tab) => tab.id === activeTabId);
         const nextIndex = (currentIndex + 1) % tabs.length;
         setActiveTabId(tabs[nextIndex].id);
+      }
+      // Ctrl+Shift+D to duplicate current tab
+      else if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        if (activeTabId) {
+          duplicateTab(activeTabId);
+        }
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [activeTabId, tabs, closeTab, closeAllTabs, createNewTab]);
+  }, [activeTabId, tabs, closeTab, closeAllTabs, createNewTab, duplicateTab]);
 
-  const activeTab = tabs.find((tab) => tab.id === activeTabId);
+  const activeTab = useMemo(
+    () => tabs.find((tab) => tab.id === activeTabId),
+    [tabs, activeTabId],
+  );
 
   return (
     <div
@@ -229,7 +284,11 @@ export function TabSystem() {
                   ? "tab-item active bg-gray-700 text-white border-b-2 border-blue-500 shadow-md"
                   : "bg-gray-600 text-gray-300 hover:bg-gray-500"
               }`}
-              onClick={() => setActiveTabId(tab.id)}
+              onClick={() => {
+                if (tab.id !== activeTabId) {
+                  setActiveTabId(tab.id);
+                }
+              }}
               onContextMenu={(e) => {
                 e.preventDefault();
                 setContextMenu({
@@ -303,6 +362,24 @@ export function TabSystem() {
             </svg>
           </button>
 
+          {/* Duplicate Active Tab */}
+          {activeTab && (
+            <button
+              onClick={() => duplicateTab(activeTab.id)}
+              className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 bg-blue-700 hover:bg-blue-600 text-white rounded-lg transition-colors ml-1 touch-manipulation shadow-md hover:shadow-lg"
+              title="Copy current tab"
+            >
+              <svg
+                className="w-4 h-4 md:w-5 md:h-5"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v1h-2V4H7v8h1v2H7a2 2 0 01-2-2V4z" />
+                <path d="M9 8a2 2 0 012-2h4a2 2 0 012 2v8a2 2 0 01-2 2h-4a2 2 0 01-2-2V8zm2 0v8h4V8h-4z" />
+              </svg>
+            </button>
+          )}
+
           {/* Close All Tabs Button (only show if more than 1 tab) */}
           {tabs.length > 1 && (
             <button
@@ -348,18 +425,16 @@ export function TabSystem() {
       {/* Tab Content */}
       <div className="flex-1">
         {activeTab && (
-          <div className="fade-in">
-            <ChessBot
-              key={activeTab.id}
-              tabId={activeTab.id}
-              tabName={activeTab.name}
-              initialGameState={activeTab.gameState}
-              onGameStateChange={(gameState) =>
-                updateTabGameState(activeTab.id, gameState)
-              }
-              onRename={(newName) => renameTab(activeTab.id, newName)}
-            />
-          </div>
+          <ChessBot
+            key={activeTab.id}
+            tabId={activeTab.id}
+            tabName={activeTab.name}
+            initialGameState={activeTab.gameState}
+            onGameStateChange={(gameState) =>
+              updateTabGameState(activeTab.id, gameState)
+            }
+            onRename={(newName) => renameTab(activeTab.id, newName)}
+          />
         )}
       </div>
 
@@ -411,6 +486,17 @@ export function TabSystem() {
           )}
 
           <hr className="border-gray-600 my-1" />
+
+          <button
+            onClick={() => {
+              duplicateTab(contextMenu.tabId);
+              setContextMenu(null);
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+          >
+            <span className="text-blue-300">📑</span>
+            Copy Tab
+          </button>
 
           <button
             onClick={() => {

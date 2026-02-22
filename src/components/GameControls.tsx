@@ -74,33 +74,6 @@ export function GameControls({
 
   return (
     <div className="controls-stack space-y-4 lg:sticky lg:top-4">
-      <div className="game-card control-hero relative overflow-hidden p-4">
-        <div className="pointer-events-none absolute inset-0 opacity-30">
-          <img
-            src="/chess-pattern.svg"
-            alt=""
-            className="h-full w-full object-cover"
-            aria-hidden="true"
-          />
-        </div>
-        <div className="relative z-10 flex items-center gap-3">
-          <img
-            src="/chess-hero.svg"
-            alt="Chess illustration"
-            className="h-12 w-16 rounded-md border border-amber-600/30 object-cover"
-            loading="lazy"
-          />
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-amber-300/90">
-              Command Center
-            </p>
-            <p className="text-sm font-semibold text-white">
-              Kontrol penuh permainan, analisis, dan FEN.
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Game Status */}
       <div className="game-card control-section p-4">
         <div className="flex items-center gap-3 mb-3">

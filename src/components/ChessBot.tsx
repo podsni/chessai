@@ -179,41 +179,11 @@ export function ChessBot({
           </div>
         </div>
       )}
-
-      <section className="hero-strip container mx-auto px-2 pt-2 md:px-4 md:pt-4">
-        <div className="hero-card relative overflow-hidden rounded-xl border border-amber-900/30">
-          <img
-            src="/chess-hero.svg"
-            alt="Chess hero illustration"
-            className="hero-image h-24 w-full object-cover md:h-32"
-            loading="lazy"
-          />
-          <div className="hero-overlay absolute inset-0 flex items-end justify-between p-3 md:p-4">
-            <div className="text-white">
-              <p className="text-xs uppercase tracking-[0.2em] text-amber-300/90">
-                Analysis Studio
-              </p>
-              <p className="text-sm font-semibold md:text-base">
-                Semua mode main tetap aktif dan responsif di mobile.
-              </p>
-            </div>
-            <div className="hidden gap-2 sm:flex">
-              <span className="rounded-full bg-black/35 px-3 py-1 text-xs text-gray-100">
-                AI Ready
-              </span>
-              <span className="rounded-full bg-black/35 px-3 py-1 text-xs text-gray-100">
-                Touch First
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Main Content */}
       <main className="page-main container mx-auto px-2 py-4 md:px-4 md:py-6">
         <div className="dashboard-layout grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Chess Board - Takes up 2 columns on large screens */}
-          <div className="lg:col-span-2 order-1 lg:order-1">
+          <div className="lg:col-span-2 order-1 lg:order-1 min-w-0">
             <div className="game-card board-panel p-4 md:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
                 <h2 className="text-lg md:text-xl font-semibold text-white flex items-center gap-2 flex-wrap">
@@ -425,7 +395,7 @@ export function ChessBot({
           </div>
 
           {/* Game Controls - Takes up 1 column */}
-          <div className="lg:col-span-1 order-2 lg:order-2 controls-panel">
+          <div className="lg:col-span-1 order-2 lg:order-2 controls-panel min-w-0">
             <GameControls
               settings={settings}
               onSettingsChange={handleSettingsChange}
