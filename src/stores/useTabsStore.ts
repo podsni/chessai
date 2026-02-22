@@ -36,6 +36,7 @@ const defaultSettings: GameSettings = {
   aiColor: "black",
   aiDepth: 10,
   aiEngine: "stockfish-online",
+  analysisEngineMode: "safe",
   battleEnabled: false,
   battleOpponentEngine: "chess-api",
   showAnalysisArrows: true,

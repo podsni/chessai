@@ -4,6 +4,7 @@ import { MiniBoard } from "./MiniBoard";
 import Skeleton, { SkeletonTheme } from "react-loading-skeleton";
 import type {
   AIEngine,
+  AnalysisEngineMode,
   EngineInsight,
   GameSettings,
   GameMode,
@@ -93,6 +94,11 @@ export function GameControls({
     "stockfish-online": "Stockfish Online",
     "chess-api": "Chess API",
   };
+  const analysisModeLabels: Record<AnalysisEngineMode, string> = {
+    single: "Selected Engine",
+    safe: "Safe (Consensus)",
+    both: "Dual Engines",
+  };
 
   const buildPredictionSteps = (fen: string, moves: string[], maxSteps = 4) => {
     const board = new Chess(fen);
@@ -153,6 +159,14 @@ export function GameControls({
               </span>
             )}
           </div>
+          {isAnalysisMode && (
+            <div className="mt-1 text-xs text-gray-300">
+              Analyze Mode:{" "}
+              <span className="text-white font-medium">
+                {analysisModeLabels[settings.analysisEngineMode]}
+              </span>
+            </div>
+          )}
           {engineNotice && (
             <div className="mt-2 text-xs text-amber-300 bg-amber-900/20 border border-amber-700/30 rounded px-2 py-1">
               {engineNotice}
@@ -499,6 +513,30 @@ export function GameControls({
                 <option value="chess-api">Chess API</option>
               </select>
             </div>
+
+            {isAnalysisMode && (
+              <div>
+                <label
+                  className="block text-sm font-medium mb-2"
+                  style={{ color: "var(--text-light)" }}
+                >
+                  Analysis Engine Strategy
+                </label>
+                <select
+                  value={settings.analysisEngineMode}
+                  onChange={(e) =>
+                    onSettingsChange({
+                      analysisEngineMode: e.target.value as AnalysisEngineMode,
+                    })
+                  }
+                  className="chess-input w-full"
+                >
+                  <option value="safe">Safe (Consensus 2 engines)</option>
+                  <option value="single">Selected Engine Only</option>
+                  <option value="both">Dual Engines + Dual Arrows</option>
+                </select>
+              </div>
+            )}
 
             {settings.mode === "ai-vs-ai" && (
               <>

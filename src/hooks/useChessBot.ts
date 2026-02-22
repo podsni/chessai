@@ -59,6 +59,7 @@ export const useChessBot = (
       aiColor: "black",
       aiDepth: savedSettings.aiDepth,
       aiEngine: savedSettings.aiEngine || "stockfish-online",
+      analysisEngineMode: savedSettings.analysisEngineMode || "safe",
       battleEnabled: savedSettings.battleEnabled || false,
       battleOpponentEngine: savedSettings.battleOpponentEngine || "chess-api",
       showAnalysisArrows: savedSettings.showAnalysisArrows,
@@ -365,45 +366,86 @@ export const useChessBot = (
         const preferredResult =
           results.find((r) => r.requestedEngine === settings.aiEngine) ||
           results[0];
-        setAnalysis(preferredResult.analysis);
+        const safeMove = pickSafeMove(results, chess.turn());
 
-        if (settings.showAnalysisArrows) {
-          const arrowColors: Record<AIEngine, string> = {
-            "stockfish-online": "#7fb069",
-            "chess-api": "#3b82f6",
-          };
-          const parsedArrows = results
-            .map((result) => {
-              const bestMove = engineClients[
-                result.engineUsed
-              ].extractMoveFromString(result.analysis.bestmove || "");
-              const parsed = bestMove ? parseMove(bestMove) : null;
-              if (!parsed) return null;
-              return {
-                from: parsed.from,
-                to: parsed.to,
-                color: arrowColors[result.requestedEngine],
-              } as AnalysisArrow;
-            })
-            .filter((arrow): arrow is AnalysisArrow => Boolean(arrow));
+        if (settings.analysisEngineMode === "single") {
+          setAnalysis(preferredResult.analysis);
+          setEngineInsights([
+            toEngineInsight(
+              preferredResult.engineUsed,
+              preferredResult.analysis,
+            ),
+          ]);
+          const singleBest = preferredResult.analysis.bestmove
+            ? engineClients[preferredResult.engineUsed].extractMoveFromString(
+                preferredResult.analysis.bestmove,
+              )
+            : null;
+          setHintMove(singleBest);
+          createAnalysisArrows(singleBest);
+        } else if (settings.analysisEngineMode === "safe") {
+          setAnalysis(preferredResult.analysis);
+          setEngineInsights(insights);
+          setHintMove(safeMove);
 
-          const arrows: AnalysisArrow[] =
-            parsedArrows.length >= 2 &&
-            parsedArrows[0].from === parsedArrows[1].from &&
-            parsedArrows[0].to === parsedArrows[1].to
-              ? [
-                  {
-                    ...parsedArrows[0],
-                    color: "#facc15",
-                  },
-                ]
-              : parsedArrows;
-          setAnalysisArrows(arrows);
+          if (settings.showAnalysisArrows && safeMove) {
+            const parsedSafe = parseMove(safeMove);
+            setAnalysisArrows(
+              parsedSafe
+                ? [
+                    {
+                      from: parsedSafe.from,
+                      to: parsedSafe.to,
+                      color: "#facc15",
+                    },
+                  ]
+                : [],
+            );
+          } else {
+            setAnalysisArrows([]);
+          }
         } else {
-          setAnalysisArrows([]);
-        }
+          // "both" mode
+          setAnalysis(preferredResult.analysis);
+          setEngineInsights(insights);
+          setHintMove(safeMove);
 
-        setHintMove(pickSafeMove(results, chess.turn()));
+          if (settings.showAnalysisArrows) {
+            const arrowColors: Record<AIEngine, string> = {
+              "stockfish-online": "#7fb069",
+              "chess-api": "#3b82f6",
+            };
+            const parsedArrows = results
+              .map((result) => {
+                const bestMove = engineClients[
+                  result.engineUsed
+                ].extractMoveFromString(result.analysis.bestmove || "");
+                const parsed = bestMove ? parseMove(bestMove) : null;
+                if (!parsed) return null;
+                return {
+                  from: parsed.from,
+                  to: parsed.to,
+                  color: arrowColors[result.requestedEngine],
+                } as AnalysisArrow;
+              })
+              .filter((arrow): arrow is AnalysisArrow => Boolean(arrow));
+
+            const arrows: AnalysisArrow[] =
+              parsedArrows.length >= 2 &&
+              parsedArrows[0].from === parsedArrows[1].from &&
+              parsedArrows[0].to === parsedArrows[1].to
+                ? [
+                    {
+                      ...parsedArrows[0],
+                      color: "#facc15",
+                    },
+                  ]
+                : parsedArrows;
+            setAnalysisArrows(arrows);
+          } else {
+            setAnalysisArrows([]);
+          }
+        }
 
         const fallbackMessages = results
           .filter((r) => r.fallbackUsed)
@@ -445,6 +487,7 @@ export const useChessBot = (
     chess,
     settings.aiDepth,
     settings.aiEngine,
+    settings.analysisEngineMode,
     settings.analysisMode,
     settings.showAnalysisArrows,
     createAnalysisArrows,

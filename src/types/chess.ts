@@ -4,6 +4,7 @@ export type GameMode = "human-vs-ai" | "ai-vs-ai" | "human-vs-human";
 export type BoardOrientation = "white" | "black";
 export type PlayerColor = "white" | "black";
 export type AIEngine = "stockfish-online" | "chess-api";
+export type AnalysisEngineMode = "single" | "safe" | "both";
 
 export interface GameSettings {
   mode: GameMode;
@@ -12,6 +13,7 @@ export interface GameSettings {
   aiColor: PlayerColor; // AI color
   aiDepth: number;
   aiEngine: AIEngine;
+  analysisEngineMode: AnalysisEngineMode;
   battleEnabled: boolean;
   battleOpponentEngine: AIEngine;
   showAnalysisArrows: boolean;
