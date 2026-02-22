@@ -67,6 +67,8 @@ export function ChessBot({
     moveHistory,
     analysisArrows,
     hintMove,
+    isAiVsAiPaused,
+    engineNotice,
     handleSquareClick,
     handlePieceDrop,
     handleSettingsChange,
@@ -81,6 +83,8 @@ export function ChessBot({
     handleLoadFen,
     handleCopyFen,
     handleLoadPGN,
+    handlePauseAiVsAi,
+    handleResumeAiVsAi,
   } = useChessBot(initialGameState, onGameStateChange);
 
   // Determine if pieces should be draggable
@@ -436,6 +440,10 @@ export function ChessBot({
               hintMove={hintMove || undefined}
               isAnalysisMode={settings.analysisMode}
               boardOrientation={settings.boardOrientation}
+              isAiVsAiPaused={isAiVsAiPaused}
+              engineNotice={engineNotice}
+              onPauseAiVsAi={handlePauseAiVsAi}
+              onResumeAiVsAi={handleResumeAiVsAi}
             />
           </div>
         </div>

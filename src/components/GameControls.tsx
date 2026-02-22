@@ -26,6 +26,10 @@ interface GameControlsProps {
   hintMove?: string;
   isAnalysisMode: boolean;
   boardOrientation: "white" | "black";
+  isAiVsAiPaused: boolean;
+  engineNotice: string | null;
+  onPauseAiVsAi: () => void;
+  onResumeAiVsAi: () => void;
 }
 
 export function GameControls({
@@ -51,6 +55,10 @@ export function GameControls({
   isAnalysisMode,
   currentFen,
   boardOrientation,
+  isAiVsAiPaused,
+  engineNotice,
+  onPauseAiVsAi,
+  onResumeAiVsAi,
 }: GameControlsProps) {
   const [fenInput, setFenInput] = useState("");
   const [showPrediction, setShowPrediction] = useState(false);
@@ -115,14 +123,19 @@ export function GameControls({
             <span className="text-white font-medium">
               {engineLabels[settings.aiEngine]}
             </span>
-            {settings.mode === "ai-vs-ai" && settings.battleEnabled && (
+            {settings.mode === "ai-vs-ai" && (
               <span className="text-gray-300">
                 {" "}
-                (Battle: {engineLabels[settings.aiEngine]} vs{" "}
+                (White: {engineLabels[settings.aiEngine]} vs Black:{" "}
                 {engineLabels[settings.battleOpponentEngine]})
               </span>
             )}
           </div>
+          {engineNotice && (
+            <div className="mt-2 text-xs text-amber-300 bg-amber-900/20 border border-amber-700/30 rounded px-2 py-1">
+              {engineNotice}
+            </div>
+          )}
         </div>
 
         {/* AI Prediction Mini Board */}
@@ -237,6 +250,25 @@ export function GameControls({
               </button>
             ))}
           </div>
+
+          {settings.mode === "ai-vs-ai" && (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                onClick={onPauseAiVsAi}
+                className="chess-button secondary w-full"
+                disabled={isAiVsAiPaused || isThinking}
+              >
+                ⏸ Stop
+              </button>
+              <button
+                onClick={onResumeAiVsAi}
+                className="chess-button w-full"
+                disabled={!isAiVsAiPaused || isThinking}
+              >
+                ▶ Resume
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Game Controls */}
@@ -360,7 +392,7 @@ export function GameControls({
                 className="block text-sm font-medium mb-2"
                 style={{ color: "var(--text-light)" }}
               >
-                Primary Engine
+                {settings.mode === "ai-vs-ai" ? "White Engine" : "AI Engine"}
               </label>
               <select
                 value={settings.aiEngine}
@@ -376,47 +408,26 @@ export function GameControls({
 
             {settings.mode === "ai-vs-ai" && (
               <>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="battleEnabled"
-                    checked={settings.battleEnabled}
-                    onChange={(e) =>
-                      onSettingsChange({ battleEnabled: e.target.checked })
-                    }
-                    className="chess-checkbox"
-                  />
+                <div>
                   <label
-                    htmlFor="battleEnabled"
-                    className="text-sm"
+                    className="block text-sm font-medium mb-2"
                     style={{ color: "var(--text-light)" }}
                   >
-                    Engine Battle (White vs Black pakai engine berbeda)
+                    Black Engine
                   </label>
+                  <select
+                    value={settings.battleOpponentEngine}
+                    onChange={(e) =>
+                      onSettingsChange({
+                        battleOpponentEngine: e.target.value as AIEngine,
+                      })
+                    }
+                    className="chess-input w-full"
+                  >
+                    <option value="stockfish-online">Stockfish Online</option>
+                    <option value="chess-api">Chess API</option>
+                  </select>
                 </div>
-
-                {settings.battleEnabled && (
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-2"
-                      style={{ color: "var(--text-light)" }}
-                    >
-                      Opponent Engine (Black)
-                    </label>
-                    <select
-                      value={settings.battleOpponentEngine}
-                      onChange={(e) =>
-                        onSettingsChange({
-                          battleOpponentEngine: e.target.value as AIEngine,
-                        })
-                      }
-                      className="chess-input w-full"
-                    >
-                      <option value="stockfish-online">Stockfish Online</option>
-                      <option value="chess-api">Chess API</option>
-                    </select>
-                  </div>
-                )}
               </>
             )}
 

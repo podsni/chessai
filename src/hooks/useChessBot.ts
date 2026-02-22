@@ -80,6 +80,8 @@ export const useChessBot = (
   );
   const [analysisArrows, setAnalysisArrows] = useState<AnalysisArrow[]>([]);
   const [hintMove, setHintMove] = useState<string | null>(null);
+  const [isAiVsAiPaused, setIsAiVsAiPaused] = useState(false);
+  const [engineNotice, setEngineNotice] = useState<string | null>(null);
   const currentFen = chess.fen();
   const currentPgn = chess.pgn();
 
@@ -199,40 +201,65 @@ export const useChessBot = (
     [queryClient],
   );
 
+  const getFallbackEngine = useCallback(
+    (engine: AIEngine): AIEngine =>
+      engine === "stockfish-online" ? "chess-api" : "stockfish-online",
+    [],
+  );
+
   const getEngineForCurrentTurn = useCallback((): AIEngine => {
-    if (settings.mode !== "ai-vs-ai" || !settings.battleEnabled) {
+    if (settings.mode !== "ai-vs-ai") {
       return settings.aiEngine;
     }
     return chess.turn() === "w"
       ? settings.aiEngine
       : settings.battleOpponentEngine;
-  }, [
-    settings.mode,
-    settings.battleEnabled,
-    settings.aiEngine,
-    settings.battleOpponentEngine,
-    chess,
-  ]);
+  }, [settings.mode, settings.aiEngine, settings.battleOpponentEngine, chess]);
+
+  const getSafeAnalysis = useCallback(
+    async (fen: string, depth: number, preferredEngine: AIEngine) => {
+      try {
+        const analysis = await getAnalysisCached(fen, depth, preferredEngine);
+        return { analysis, engineUsed: preferredEngine, fallbackUsed: false };
+      } catch (error) {
+        console.warn(
+          `Engine ${preferredEngine} failed, trying fallback engine`,
+          error,
+        );
+        const fallbackEngine = getFallbackEngine(preferredEngine);
+        const analysis = await getAnalysisCached(fen, depth, fallbackEngine);
+        return { analysis, engineUsed: fallbackEngine, fallbackUsed: true };
+      }
+    },
+    [getAnalysisCached, getFallbackEngine],
+  );
 
   const handleAnalyzePosition = useCallback(async () => {
     setIsThinking(true);
     try {
-      const analysisResult = await getAnalysisCached(
+      const preferredEngine = getEngineForCurrentTurn();
+      const { analysis, engineUsed, fallbackUsed } = await getSafeAnalysis(
         chess.fen(),
         settings.aiDepth,
-        getEngineForCurrentTurn(),
+        preferredEngine,
       );
 
-      setAnalysis(analysisResult);
+      setAnalysis(analysis);
+      setEngineNotice(
+        fallbackUsed
+          ? `Engine ${preferredEngine} bermasalah, fallback ke ${engineUsed}.`
+          : null,
+      );
 
-      if (analysisResult?.bestmove) {
-        const cleanMove = engineClients[
-          getEngineForCurrentTurn()
-        ].extractMoveFromString(analysisResult.bestmove);
+      if (analysis?.bestmove) {
+        const cleanMove = engineClients[engineUsed].extractMoveFromString(
+          analysis.bestmove,
+        );
         createAnalysisArrows(cleanMove);
       }
     } catch (error) {
       console.error("Error analyzing position:", error);
+      setEngineNotice("Semua engine gagal merespons. Coba lagi sebentar.");
     } finally {
       setIsThinking(false);
     }
@@ -240,7 +267,7 @@ export const useChessBot = (
     chess,
     settings.aiDepth,
     createAnalysisArrows,
-    getAnalysisCached,
+    getSafeAnalysis,
     getEngineForCurrentTurn,
   ]);
 
@@ -396,11 +423,20 @@ export const useChessBot = (
 
     setIsThinking(true);
     try {
-      const activeEngine = getEngineForCurrentTurn();
-      const bestMove = await engineClients[activeEngine].getBestMove(
+      const preferredEngine = getEngineForCurrentTurn();
+      const { analysis, engineUsed, fallbackUsed } = await getSafeAnalysis(
         chess.fen(),
         settings.aiDepth,
+        preferredEngine,
       );
+      setEngineNotice(
+        fallbackUsed
+          ? `Engine ${preferredEngine} bermasalah, fallback ke ${engineUsed}.`
+          : null,
+      );
+      const bestMove = analysis.bestmove
+        ? engineClients[engineUsed].extractMoveFromString(analysis.bestmove)
+        : null;
 
       if (bestMove) {
         const move = chess.move(bestMove);
@@ -411,18 +447,20 @@ export const useChessBot = (
 
           // Update analysis with bot move
           if (settings.autoAnalysis || settings.analysisMode) {
-            const analysisResult = await getAnalysisCached(
+            const nextPreferredEngine = getEngineForCurrentTurn();
+            const nextAnalysis = await getSafeAnalysis(
               chess.fen(),
               settings.aiDepth,
-              activeEngine,
+              nextPreferredEngine,
             );
-            setAnalysis(analysisResult);
-            createAnalysisArrows(analysisResult?.bestmove || null);
+            setAnalysis(nextAnalysis.analysis);
+            createAnalysisArrows(nextAnalysis.analysis?.bestmove || null);
           }
         }
       }
     } catch (error) {
       console.error("Error getting bot move:", error);
+      setEngineNotice("Langkah AI gagal karena engine tidak merespons.");
     } finally {
       setIsThinking(false);
     }
@@ -434,30 +472,37 @@ export const useChessBot = (
     settings.analysisMode,
     updateGameState,
     createAnalysisArrows,
-    getAnalysisCached,
+    getSafeAnalysis,
     getEngineForCurrentTurn,
   ]);
 
   const handleGetHint = useCallback(async () => {
     setIsThinking(true);
     try {
-      const analysisResult = await getAnalysisCached(
+      const preferredEngine = getEngineForCurrentTurn();
+      const { analysis, engineUsed, fallbackUsed } = await getSafeAnalysis(
         chess.fen(),
         settings.aiDepth,
-        getEngineForCurrentTurn(),
+        preferredEngine,
+      );
+      setEngineNotice(
+        fallbackUsed
+          ? `Engine ${preferredEngine} bermasalah, fallback ke ${engineUsed}.`
+          : null,
       );
 
-      if (analysisResult?.bestmove) {
-        const cleanMove = engineClients[
-          getEngineForCurrentTurn()
-        ].extractMoveFromString(analysisResult.bestmove);
+      if (analysis?.bestmove) {
+        const cleanMove = engineClients[engineUsed].extractMoveFromString(
+          analysis.bestmove,
+        );
 
         setHintMove(cleanMove);
-        setAnalysis(analysisResult);
+        setAnalysis(analysis);
         createAnalysisArrows(cleanMove);
       }
     } catch (error) {
       console.error("Error getting hint:", error);
+      setEngineNotice("Gagal mendapatkan hint dari engine.");
     } finally {
       setIsThinking(false);
     }
@@ -465,7 +510,7 @@ export const useChessBot = (
     chess,
     settings.aiDepth,
     createAnalysisArrows,
-    getAnalysisCached,
+    getSafeAnalysis,
     getEngineForCurrentTurn,
   ]);
 
@@ -556,6 +601,7 @@ export const useChessBot = (
   const handleSettingsChange = useCallback(
     (newSettings: Partial<GameSettings>) => {
       setSettings((prev) => ({ ...prev, ...newSettings }));
+      setEngineNotice(null);
 
       // Clear arrows if analysis arrows are disabled
       if (newSettings.showAnalysisArrows === false) {
@@ -569,6 +615,14 @@ export const useChessBot = (
     },
     [isThinking, handleAnalyzePosition],
   );
+
+  const handlePauseAiVsAi = useCallback(() => {
+    setIsAiVsAiPaused(true);
+  }, []);
+
+  const handleResumeAiVsAi = useCallback(() => {
+    setIsAiVsAiPaused(false);
+  }, []);
 
   const handleCopyFen = useCallback(async () => {
     try {
@@ -641,7 +695,8 @@ export const useChessBot = (
       settings.mode === "ai-vs-ai" &&
       !chess.isGameOver() &&
       !isThinking &&
-      !settings.analysisMode
+      !settings.analysisMode &&
+      !isAiVsAiPaused
     ) {
       timeoutId = window.setTimeout(() => {
         handleBotMove();
@@ -651,7 +706,20 @@ export const useChessBot = (
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [settings.mode, settings.analysisMode, chess, isThinking, handleBotMove]);
+  }, [
+    settings.mode,
+    settings.analysisMode,
+    chess,
+    isThinking,
+    handleBotMove,
+    isAiVsAiPaused,
+  ]);
+
+  useEffect(() => {
+    if (settings.mode !== "ai-vs-ai") {
+      setIsAiVsAiPaused(false);
+    }
+  }, [settings.mode]);
 
   // Auto bot move for human vs AI
   useEffect(() => {
@@ -710,6 +778,8 @@ export const useChessBot = (
     moveHistory,
     analysisArrows,
     hintMove,
+    isAiVsAiPaused,
+    engineNotice,
     handleSquareClick,
     handlePieceDrop,
     handleSettingsChange,
@@ -724,5 +794,7 @@ export const useChessBot = (
     handleLoadFen,
     handleCopyFen,
     handleLoadPGN,
+    handlePauseAiVsAi,
+    handleResumeAiVsAi,
   };
 };
