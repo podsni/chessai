@@ -19,6 +19,9 @@ interface GameSettings {
   boardOrientation: "white" | "black";
   humanColor: "white" | "black";
   aiColor: "white" | "black";
+  aiEngine: "stockfish-online" | "chess-api";
+  battleEnabled: boolean;
+  battleOpponentEngine: "stockfish-online" | "chess-api";
   showAnalysisArrows: boolean;
   autoAnalysis: boolean;
   aiDepth: number;
@@ -116,6 +119,9 @@ class GameStorage {
         boardOrientation: "white",
         humanColor: "white",
         aiColor: "black",
+        aiEngine: "stockfish-online",
+        battleEnabled: false,
+        battleOpponentEngine: "chess-api",
         showAnalysisArrows: true,
         autoAnalysis: false,
         aiDepth: 10,
@@ -133,6 +139,9 @@ class GameStorage {
         boardOrientation: "white",
         humanColor: "white",
         aiColor: "black",
+        aiEngine: "stockfish-online",
+        battleEnabled: false,
+        battleOpponentEngine: "chess-api",
         showAnalysisArrows: true,
         autoAnalysis: false,
         aiDepth: 10,

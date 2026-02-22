@@ -2,11 +2,13 @@ import { useState, useCallback, useEffect } from "react";
 import { Chess, Square } from "chess.js";
 import { useQueryClient } from "@tanstack/react-query";
 import { StockfishAPI } from "../services/stockfishApi";
+import { ChessApiEngine } from "../services/chessApiEngine";
 import { soundManager } from "../services/soundManager";
 import { hapticManager } from "../services/hapticManager";
 import { gameStorage } from "../services/gameStorage";
 import type { PGNGameInfo } from "../services/pgnParser";
 import type {
+  AIEngine,
   GameState,
   StockfishResponse,
   GameSettings,
@@ -15,6 +17,12 @@ import type {
 } from "../types/chess";
 
 const stockfishApi = new StockfishAPI();
+const chessApiEngine = new ChessApiEngine();
+
+const engineClients = {
+  "stockfish-online": stockfishApi,
+  "chess-api": chessApiEngine,
+};
 
 export const useChessBot = (
   initialGameState?: PersistedGameState,
@@ -42,20 +50,25 @@ export const useChessBot = (
   });
 
   const [settings, setSettings] = useState<GameSettings>(() => {
-    if (initialGameState?.settings) {
-      return initialGameState.settings;
-    }
     const savedSettings = gameStorage.getSettings();
-    return {
+    const defaultSettings: GameSettings = {
       mode: "human-vs-ai",
       boardOrientation: savedSettings.boardOrientation,
-      humanColor: "white", // Default: human plays white
-      aiColor: "black", // Default: AI plays black
+      humanColor: "white",
+      aiColor: "black",
       aiDepth: savedSettings.aiDepth,
+      aiEngine: savedSettings.aiEngine || "stockfish-online",
+      battleEnabled: savedSettings.battleEnabled || false,
+      battleOpponentEngine: savedSettings.battleOpponentEngine || "chess-api",
       showAnalysisArrows: savedSettings.showAnalysisArrows,
       autoAnalysis: savedSettings.autoAnalysis,
       analysisMode: false,
     };
+
+    if (initialGameState?.settings) {
+      return { ...defaultSettings, ...initialGameState.settings };
+    }
+    return defaultSettings;
   });
 
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
@@ -178,13 +191,28 @@ export const useChessBot = (
   );
 
   const getAnalysisCached = useCallback(
-    async (fen: string, depth: number) =>
+    async (fen: string, depth: number, engine: AIEngine) =>
       queryClient.fetchQuery({
-        queryKey: ["stockfish-analysis", fen, depth],
-        queryFn: () => stockfishApi.getAnalysis(fen, depth),
+        queryKey: ["engine-analysis", engine, fen, depth],
+        queryFn: () => engineClients[engine].getAnalysis(fen, depth),
       }),
     [queryClient],
   );
+
+  const getEngineForCurrentTurn = useCallback((): AIEngine => {
+    if (settings.mode !== "ai-vs-ai" || !settings.battleEnabled) {
+      return settings.aiEngine;
+    }
+    return chess.turn() === "w"
+      ? settings.aiEngine
+      : settings.battleOpponentEngine;
+  }, [
+    settings.mode,
+    settings.battleEnabled,
+    settings.aiEngine,
+    settings.battleOpponentEngine,
+    chess,
+  ]);
 
   const handleAnalyzePosition = useCallback(async () => {
     setIsThinking(true);
@@ -192,14 +220,15 @@ export const useChessBot = (
       const analysisResult = await getAnalysisCached(
         chess.fen(),
         settings.aiDepth,
+        getEngineForCurrentTurn(),
       );
 
       setAnalysis(analysisResult);
 
       if (analysisResult?.bestmove) {
-        const cleanMove = stockfishApi.extractMoveFromString(
-          analysisResult.bestmove,
-        );
+        const cleanMove = engineClients[
+          getEngineForCurrentTurn()
+        ].extractMoveFromString(analysisResult.bestmove);
         createAnalysisArrows(cleanMove);
       }
     } catch (error) {
@@ -207,7 +236,13 @@ export const useChessBot = (
     } finally {
       setIsThinking(false);
     }
-  }, [chess, settings.aiDepth, createAnalysisArrows, getAnalysisCached]);
+  }, [
+    chess,
+    settings.aiDepth,
+    createAnalysisArrows,
+    getAnalysisCached,
+    getEngineForCurrentTurn,
+  ]);
 
   const makeMove = useCallback(
     (from: Square, to: Square) => {
@@ -361,7 +396,8 @@ export const useChessBot = (
 
     setIsThinking(true);
     try {
-      const bestMove = await stockfishApi.getBestMove(
+      const activeEngine = getEngineForCurrentTurn();
+      const bestMove = await engineClients[activeEngine].getBestMove(
         chess.fen(),
         settings.aiDepth,
       );
@@ -378,6 +414,7 @@ export const useChessBot = (
             const analysisResult = await getAnalysisCached(
               chess.fen(),
               settings.aiDepth,
+              activeEngine,
             );
             setAnalysis(analysisResult);
             createAnalysisArrows(analysisResult?.bestmove || null);
@@ -398,6 +435,7 @@ export const useChessBot = (
     updateGameState,
     createAnalysisArrows,
     getAnalysisCached,
+    getEngineForCurrentTurn,
   ]);
 
   const handleGetHint = useCallback(async () => {
@@ -406,12 +444,13 @@ export const useChessBot = (
       const analysisResult = await getAnalysisCached(
         chess.fen(),
         settings.aiDepth,
+        getEngineForCurrentTurn(),
       );
 
       if (analysisResult?.bestmove) {
-        const cleanMove = stockfishApi.extractMoveFromString(
-          analysisResult.bestmove,
-        );
+        const cleanMove = engineClients[
+          getEngineForCurrentTurn()
+        ].extractMoveFromString(analysisResult.bestmove);
 
         setHintMove(cleanMove);
         setAnalysis(analysisResult);
@@ -422,7 +461,13 @@ export const useChessBot = (
     } finally {
       setIsThinking(false);
     }
-  }, [chess, settings.aiDepth, createAnalysisArrows, getAnalysisCached]);
+  }, [
+    chess,
+    settings.aiDepth,
+    createAnalysisArrows,
+    getAnalysisCached,
+    getEngineForCurrentTurn,
+  ]);
 
   const handleNewGame = useCallback(() => {
     chess.reset();

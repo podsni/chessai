@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MiniBoard } from "./MiniBoard";
 import Skeleton, { SkeletonTheme } from "react-loading-skeleton";
-import type { GameSettings, GameMode } from "../types/chess";
+import type { AIEngine, GameSettings, GameMode } from "../types/chess";
 
 interface GameControlsProps {
   settings: GameSettings;
@@ -73,6 +73,11 @@ export function GameControls({
     return "—";
   };
 
+  const engineLabels: Record<AIEngine, string> = {
+    "stockfish-online": "Stockfish Online",
+    "chess-api": "Chess API",
+  };
+
   return (
     <SkeletonTheme baseColor="#2a2722" highlightColor="#3a352d">
       <div className="controls-stack space-y-4 lg:sticky lg:top-4">
@@ -102,6 +107,19 @@ export function GameControls({
             {isAnalysisMode && (
               <span className="ml-2 px-2 py-1 bg-blue-600 text-white text-xs rounded">
                 ANALYSIS
+              </span>
+            )}
+          </div>
+          <div className="mt-2 text-xs" style={{ color: "var(--text-light)" }}>
+            Engine:{" "}
+            <span className="text-white font-medium">
+              {engineLabels[settings.aiEngine]}
+            </span>
+            {settings.mode === "ai-vs-ai" && settings.battleEnabled && (
+              <span className="text-gray-300">
+                {" "}
+                (Battle: {engineLabels[settings.aiEngine]} vs{" "}
+                {engineLabels[settings.battleOpponentEngine]})
               </span>
             )}
           </div>
@@ -336,6 +354,71 @@ export function GameControls({
                 </span>
               </div>
             </div>
+
+            <div>
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: "var(--text-light)" }}
+              >
+                Primary Engine
+              </label>
+              <select
+                value={settings.aiEngine}
+                onChange={(e) =>
+                  onSettingsChange({ aiEngine: e.target.value as AIEngine })
+                }
+                className="chess-input w-full"
+              >
+                <option value="stockfish-online">Stockfish Online</option>
+                <option value="chess-api">Chess API</option>
+              </select>
+            </div>
+
+            {settings.mode === "ai-vs-ai" && (
+              <>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="battleEnabled"
+                    checked={settings.battleEnabled}
+                    onChange={(e) =>
+                      onSettingsChange({ battleEnabled: e.target.checked })
+                    }
+                    className="chess-checkbox"
+                  />
+                  <label
+                    htmlFor="battleEnabled"
+                    className="text-sm"
+                    style={{ color: "var(--text-light)" }}
+                  >
+                    Engine Battle (White vs Black pakai engine berbeda)
+                  </label>
+                </div>
+
+                {settings.battleEnabled && (
+                  <div>
+                    <label
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-light)" }}
+                    >
+                      Opponent Engine (Black)
+                    </label>
+                    <select
+                      value={settings.battleOpponentEngine}
+                      onChange={(e) =>
+                        onSettingsChange({
+                          battleOpponentEngine: e.target.value as AIEngine,
+                        })
+                      }
+                      className="chess-input w-full"
+                    >
+                      <option value="stockfish-online">Stockfish Online</option>
+                      <option value="chess-api">Chess API</option>
+                    </select>
+                  </div>
+                )}
+              </>
+            )}
 
             <div className="flex items-center gap-3">
               <input

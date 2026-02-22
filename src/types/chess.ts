@@ -3,6 +3,7 @@ import { Chess, Square } from "chess.js";
 export type GameMode = "human-vs-ai" | "ai-vs-ai" | "human-vs-human";
 export type BoardOrientation = "white" | "black";
 export type PlayerColor = "white" | "black";
+export type AIEngine = "stockfish-online" | "chess-api";
 
 export interface GameSettings {
   mode: GameMode;
@@ -10,6 +11,9 @@ export interface GameSettings {
   humanColor: PlayerColor; // Human player color
   aiColor: PlayerColor; // AI color
   aiDepth: number;
+  aiEngine: AIEngine;
+  battleEnabled: boolean;
+  battleOpponentEngine: AIEngine;
   showAnalysisArrows: boolean;
   autoAnalysis: boolean;
   analysisMode: boolean;
