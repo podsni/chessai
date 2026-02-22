@@ -1,5 +1,5 @@
-import { TabSystem } from './components/TabSystem';
-import { ErrorBoundary } from './components/ErrorBoundary';
+import { TabSystem } from "./components/TabSystem";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 function App() {
   return (

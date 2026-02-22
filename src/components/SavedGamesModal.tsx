@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { gameStorage, type SavedGame } from '../services/gameStorage';
+import { useState } from "react";
+import { gameStorage, type SavedGame } from "../services/gameStorage";
 
 interface SavedGamesModalProps {
   isOpen: boolean;
@@ -7,15 +7,21 @@ interface SavedGamesModalProps {
   onLoadGame: (fen: string) => void;
 }
 
-export function SavedGamesModal({ isOpen, onClose, onLoadGame }: SavedGamesModalProps) {
-  const [savedGames, setSavedGames] = useState<SavedGame[]>(() => gameStorage.getSavedGames());
+export function SavedGamesModal({
+  isOpen,
+  onClose,
+  onLoadGame,
+}: SavedGamesModalProps) {
+  const [savedGames, setSavedGames] = useState<SavedGame[]>(() =>
+    gameStorage.getSavedGames(),
+  );
   const [showExportData, setShowExportData] = useState(false);
-  const [exportData, setExportData] = useState('');
+  const [exportData, setExportData] = useState("");
 
   if (!isOpen) return null;
 
   const handleDeleteGame = (gameId: string) => {
-    if (confirm('Are you sure you want to delete this saved game?')) {
+    if (confirm("Are you sure you want to delete this saved game?")) {
       gameStorage.deleteGame(gameId);
       setSavedGames(gameStorage.getSavedGames());
     }
@@ -34,7 +40,7 @@ export function SavedGamesModal({ isOpen, onClose, onLoadGame }: SavedGamesModal
 
   const handleCopyExportData = () => {
     navigator.clipboard.writeText(exportData);
-    alert('Export data copied to clipboard!');
+    alert("Export data copied to clipboard!");
   };
 
   const formatDate = (timestamp: number) => {
@@ -42,8 +48,10 @@ export function SavedGamesModal({ isOpen, onClose, onLoadGame }: SavedGamesModal
   };
 
   const formatGameInfo = (game: SavedGame) => {
-    const moves = game.moveCount ? `${game.moveCount} moves` : 'New game';
-    const eval_text = game.evaluation ? ` • Eval: ${(game.evaluation / 100).toFixed(2)}` : '';
+    const moves = game.moveCount ? `${game.moveCount} moves` : "New game";
+    const eval_text = game.evaluation
+      ? ` • Eval: ${(game.evaluation / 100).toFixed(2)}`
+      : "";
     return `${moves}${eval_text}`;
   };
 
@@ -94,13 +102,21 @@ export function SavedGamesModal({ isOpen, onClose, onLoadGame }: SavedGamesModal
                 if (autoSaved) {
                   return (
                     <div className="mb-6">
-                      <h3 className="text-lg font-medium text-white mb-3">🔄 Auto-saved Game</h3>
+                      <h3 className="text-lg font-medium text-white mb-3">
+                        🔄 Auto-saved Game
+                      </h3>
                       <div className="bg-gray-700 rounded-lg p-4 hover:bg-gray-650 transition-colors">
                         <div className="flex items-center justify-between">
                           <div>
-                            <h4 className="font-medium text-white">{autoSaved.name}</h4>
-                            <p className="text-gray-300 text-sm">{formatGameInfo(autoSaved)}</p>
-                            <p className="text-gray-400 text-xs">{formatDate(autoSaved.timestamp)}</p>
+                            <h4 className="font-medium text-white">
+                              {autoSaved.name}
+                            </h4>
+                            <p className="text-gray-300 text-sm">
+                              {formatGameInfo(autoSaved)}
+                            </p>
+                            <p className="text-gray-400 text-xs">
+                              {formatDate(autoSaved.timestamp)}
+                            </p>
                           </div>
                           <div className="flex gap-2">
                             <button
@@ -126,7 +142,9 @@ export function SavedGamesModal({ isOpen, onClose, onLoadGame }: SavedGamesModal
 
               {/* Manually saved games */}
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-white">💾 Saved Games ({savedGames.length})</h3>
+                <h3 className="text-lg font-medium text-white">
+                  💾 Saved Games ({savedGames.length})
+                </h3>
                 <button
                   onClick={handleExportGames}
                   className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
@@ -151,12 +169,21 @@ export function SavedGamesModal({ isOpen, onClose, onLoadGame }: SavedGamesModal
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <h4 className="font-medium text-white">{game.name}</h4>
-                          <p className="text-gray-300 text-sm">{formatGameInfo(game)}</p>
-                          <p className="text-gray-400 text-xs">{formatDate(game.timestamp)}</p>
+                          <h4 className="font-medium text-white">
+                            {game.name}
+                          </h4>
+                          <p className="text-gray-300 text-sm">
+                            {formatGameInfo(game)}
+                          </p>
+                          <p className="text-gray-400 text-xs">
+                            {formatDate(game.timestamp)}
+                          </p>
                           {game.lastMove && (
                             <p className="text-gray-400 text-xs">
-                              Last move: <span className="font-mono text-green-400">{game.lastMove}</span>
+                              Last move:{" "}
+                              <span className="font-mono text-green-400">
+                                {game.lastMove}
+                              </span>
                             </p>
                           )}
                         </div>
@@ -182,14 +209,17 @@ export function SavedGamesModal({ isOpen, onClose, onLoadGame }: SavedGamesModal
 
               {/* Storage info */}
               <div className="mt-6 p-4 bg-gray-700 rounded-lg">
-                <h4 className="text-sm font-medium text-gray-300 mb-2">Storage Information</h4>
+                <h4 className="text-sm font-medium text-gray-300 mb-2">
+                  Storage Information
+                </h4>
                 <div className="text-xs text-gray-400 space-y-1">
                   <div className="flex justify-between">
                     <span>Games stored:</span>
                     <span>{savedGames.length} / 50</span>
                   </div>
                   <div className="text-xs text-gray-500 mt-2">
-                    Games are automatically saved during play. Oldest games are automatically removed when limit is reached.
+                    Games are automatically saved during play. Oldest games are
+                    automatically removed when limit is reached.
                   </div>
                 </div>
               </div>
@@ -208,4 +238,4 @@ export function SavedGamesModal({ isOpen, onClose, onLoadGame }: SavedGamesModal
       </div>
     </div>
   );
-} 
+}

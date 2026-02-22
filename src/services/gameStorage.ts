@@ -1,3 +1,5 @@
+import type { PersistedGameState } from "../types/chess";
+
 interface SavedGame {
   id: string;
   name: string;
@@ -13,28 +15,28 @@ interface SavedGame {
 interface GameSettings {
   soundEnabled: boolean;
   hapticEnabled: boolean;
-  theme: 'light' | 'dark';
-  boardOrientation: 'white' | 'black';
-  humanColor: 'white' | 'black';
-  aiColor: 'white' | 'black';
+  theme: "light" | "dark";
+  boardOrientation: "white" | "black";
+  humanColor: "white" | "black";
+  aiColor: "white" | "black";
   showAnalysisArrows: boolean;
   autoAnalysis: boolean;
   aiDepth: number;
 }
 
 class GameStorage {
-  private readonly GAMES_KEY = 'chessbot-saved-games';
-  private readonly SETTINGS_KEY = 'chessbot-settings';
+  private readonly GAMES_KEY = "chessbot-saved-games";
+  private readonly SETTINGS_KEY = "chessbot-settings";
   private readonly MAX_SAVED_GAMES = 50;
 
   // Game saving/loading
-  saveGame(game: Omit<SavedGame, 'id' | 'timestamp'>): string {
+  saveGame(game: Omit<SavedGame, "id" | "timestamp">): string {
     try {
       const gameId = this.generateId();
       const savedGame: SavedGame = {
         ...game,
         id: gameId,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       const savedGames = this.getSavedGames();
@@ -48,17 +50,17 @@ class GameStorage {
       localStorage.setItem(this.GAMES_KEY, JSON.stringify(savedGames));
       return gameId;
     } catch (error) {
-      console.error('Error saving game:', error);
-      throw new Error('Failed to save game');
+      console.error("Error saving game:", error);
+      throw new Error("Failed to save game");
     }
   }
 
   loadGame(gameId: string): SavedGame | null {
     try {
       const savedGames = this.getSavedGames();
-      return savedGames.find(game => game.id === gameId) || null;
+      return savedGames.find((game) => game.id === gameId) || null;
     } catch (error) {
-      console.error('Error loading game:', error);
+      console.error("Error loading game:", error);
       return null;
     }
   }
@@ -68,7 +70,7 @@ class GameStorage {
       const gamesJson = localStorage.getItem(this.GAMES_KEY);
       return gamesJson ? JSON.parse(gamesJson) : [];
     } catch (error) {
-      console.error('Error getting saved games:', error);
+      console.error("Error getting saved games:", error);
       return [];
     }
   }
@@ -76,11 +78,11 @@ class GameStorage {
   deleteGame(gameId: string): boolean {
     try {
       const savedGames = this.getSavedGames();
-      const filteredGames = savedGames.filter(game => game.id !== gameId);
+      const filteredGames = savedGames.filter((game) => game.id !== gameId);
       localStorage.setItem(this.GAMES_KEY, JSON.stringify(filteredGames));
       return true;
     } catch (error) {
-      console.error('Error deleting game:', error);
+      console.error("Error deleting game:", error);
       return false;
     }
   }
@@ -89,7 +91,7 @@ class GameStorage {
     try {
       localStorage.removeItem(this.GAMES_KEY);
     } catch (error) {
-      console.error('Error clearing games:', error);
+      console.error("Error clearing games:", error);
     }
   }
 
@@ -100,7 +102,7 @@ class GameStorage {
       const updatedSettings = { ...currentSettings, ...settings };
       localStorage.setItem(this.SETTINGS_KEY, JSON.stringify(updatedSettings));
     } catch (error) {
-      console.error('Error saving settings:', error);
+      console.error("Error saving settings:", error);
     }
   }
 
@@ -110,74 +112,87 @@ class GameStorage {
       const defaultSettings: GameSettings = {
         soundEnabled: true,
         hapticEnabled: true,
-        theme: 'dark',
-        boardOrientation: 'white',
-        humanColor: 'white',
-        aiColor: 'black',
+        theme: "dark",
+        boardOrientation: "white",
+        humanColor: "white",
+        aiColor: "black",
         showAnalysisArrows: true,
         autoAnalysis: false,
-        aiDepth: 10
+        aiDepth: 10,
       };
 
-      return settingsJson ? { ...defaultSettings, ...JSON.parse(settingsJson) } : defaultSettings;
+      return settingsJson
+        ? { ...defaultSettings, ...JSON.parse(settingsJson) }
+        : defaultSettings;
     } catch (error) {
-      console.error('Error getting settings:', error);
+      console.error("Error getting settings:", error);
       return {
         soundEnabled: true,
         hapticEnabled: true,
-        theme: 'dark',
-        boardOrientation: 'white',
-        humanColor: 'white',
-        aiColor: 'black',
+        theme: "dark",
+        boardOrientation: "white",
+        humanColor: "white",
+        aiColor: "black",
         showAnalysisArrows: true,
         autoAnalysis: false,
-        aiDepth: 10
+        aiDepth: 10,
       };
     }
   }
 
   // Auto-save current game
-  autoSaveCurrentGame(fen: string, pgn: string, moveCount: number, lastMove: string | null): void {
+  autoSaveCurrentGame(
+    fen: string,
+    pgn: string,
+    moveCount: number,
+    lastMove: string | null,
+  ): void {
     try {
       const autoSaveGame = {
-        name: 'Auto-saved Game',
+        name: "Auto-saved Game",
         fen,
         pgn,
         moveCount,
         lastMove,
-        gameMode: 'auto-save'
+        gameMode: "auto-save",
       };
 
-      localStorage.setItem('chessbot-auto-save', JSON.stringify({
-        ...autoSaveGame,
-        timestamp: Date.now()
-      }));
+      localStorage.setItem(
+        "chessbot-auto-save",
+        JSON.stringify({
+          ...autoSaveGame,
+          timestamp: Date.now(),
+        }),
+      );
     } catch (error) {
-      console.error('Error auto-saving game:', error);
+      console.error("Error auto-saving game:", error);
     }
   }
 
   // Save complete tab state
-  saveTabState(tabId: string, gameState: any): void {
+  saveTabState(tabId: string, gameState: PersistedGameState): void {
     try {
       const key = `chessbot-tab-${tabId}`;
-      localStorage.setItem(key, JSON.stringify({
-        ...gameState,
-        timestamp: Date.now()
-      }));
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          ...gameState,
+          timestamp: Date.now(),
+        }),
+      );
     } catch (error) {
-      console.error('Error saving tab state:', error);
+      console.error("Error saving tab state:", error);
     }
   }
 
   // Load tab state
-  loadTabState(tabId: string): any | null {
+  loadTabState(tabId: string): PersistedGameState | null {
     try {
       const key = `chessbot-tab-${tabId}`;
       const stateJson = localStorage.getItem(key);
       return stateJson ? JSON.parse(stateJson) : null;
     } catch (error) {
-      console.error('Error loading tab state:', error);
+      console.error("Error loading tab state:", error);
       return null;
     }
   }
@@ -188,25 +203,25 @@ class GameStorage {
       const key = `chessbot-tab-${tabId}`;
       localStorage.removeItem(key);
     } catch (error) {
-      console.error('Error clearing tab state:', error);
+      console.error("Error clearing tab state:", error);
     }
   }
 
   getAutoSavedGame(): SavedGame | null {
     try {
-      const autoSaveJson = localStorage.getItem('chessbot-auto-save');
+      const autoSaveJson = localStorage.getItem("chessbot-auto-save");
       return autoSaveJson ? JSON.parse(autoSaveJson) : null;
     } catch (error) {
-      console.error('Error getting auto-saved game:', error);
+      console.error("Error getting auto-saved game:", error);
       return null;
     }
   }
 
   clearAutoSave(): void {
     try {
-      localStorage.removeItem('chessbot-auto-save');
+      localStorage.removeItem("chessbot-auto-save");
     } catch (error) {
-      console.error('Error clearing auto-save:', error);
+      console.error("Error clearing auto-save:", error);
     }
   }
 
@@ -219,31 +234,35 @@ class GameStorage {
   exportGames(): string {
     const games = this.getSavedGames();
     const settings = this.getSettings();
-    
-    return JSON.stringify({
-      games,
-      settings,
-      exportDate: Date.now(),
-      version: '1.0'
-    }, null, 2);
+
+    return JSON.stringify(
+      {
+        games,
+        settings,
+        exportDate: Date.now(),
+        version: "1.0",
+      },
+      null,
+      2,
+    );
   }
 
   importGames(jsonData: string): { success: boolean; message: string } {
     try {
       const data = JSON.parse(jsonData);
-      
+
       if (data.games && Array.isArray(data.games)) {
         localStorage.setItem(this.GAMES_KEY, JSON.stringify(data.games));
       }
-      
+
       if (data.settings) {
         localStorage.setItem(this.SETTINGS_KEY, JSON.stringify(data.settings));
       }
-      
-      return { success: true, message: 'Games imported successfully' };
+
+      return { success: true, message: "Games imported successfully" };
     } catch (error) {
-      console.error('Error importing games:', error);
-      return { success: false, message: 'Invalid import data' };
+      console.error("Error importing games:", error);
+      return { success: false, message: "Invalid import data" };
     }
   }
 
@@ -252,17 +271,17 @@ class GameStorage {
     try {
       const totalSize = JSON.stringify(localStorage).length;
       const availableSize = 5 * 1024 * 1024; // Roughly 5MB limit for localStorage
-      
+
       return {
         used: totalSize,
         available: availableSize - totalSize,
-        percentage: (totalSize / availableSize) * 100
+        percentage: (totalSize / availableSize) * 100,
       };
-    } catch (error) {
+    } catch {
       return { used: 0, available: 0, percentage: 0 };
     }
   }
 }
 
 export const gameStorage = new GameStorage();
-export type { SavedGame, GameSettings }; 
+export type { SavedGame, GameSettings };

@@ -1,17 +1,28 @@
-import { useState } from 'react';
-import { soundManager } from '../services/soundManager';
-import { hapticManager } from '../services/hapticManager';
-import { gameStorage } from '../services/gameStorage';
+import { useState } from "react";
+import { soundManager } from "../services/soundManager";
+import { hapticManager } from "../services/hapticManager";
+import { gameStorage } from "../services/gameStorage";
+import type { GameSettings } from "../types/chess";
+
+type SettingsModalState = GameSettings & {
+  soundEnabled: boolean;
+  hapticEnabled: boolean;
+};
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentSettings: any; // We'll use the existing settings structure
-  onSettingsChange: (settings: any) => void;
+  currentSettings: GameSettings;
+  onSettingsChange: (settings: Partial<GameSettings>) => void;
 }
 
-export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChange }: SettingsModalProps) {
-  const [localSettings, setLocalSettings] = useState(() => {
+export function SettingsModal({
+  isOpen,
+  onClose,
+  currentSettings,
+  onSettingsChange,
+}: SettingsModalProps) {
+  const [localSettings, setLocalSettings] = useState<SettingsModalState>(() => {
     const saved = gameStorage.getSettings();
     return {
       ...currentSettings,
@@ -22,18 +33,25 @@ export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChan
 
   if (!isOpen) return null;
 
-  const handleSettingChange = (key: string, value: any) => {
-    const newSettings = { ...localSettings, [key]: value };
+  const handleSettingChange = <K extends keyof SettingsModalState>(
+    key: K,
+    value: SettingsModalState[K],
+  ) => {
+    const newSettings: SettingsModalState = { ...localSettings, [key]: value };
     setLocalSettings(newSettings);
 
     // Apply immediately for feedback settings
-    if (key === 'soundEnabled') {
-      soundManager.setEnabled(value);
-      if (value) soundManager.playClick();
+    if (key === "soundEnabled") {
+      if (typeof value === "boolean") {
+        soundManager.setEnabled(value);
+        if (value) soundManager.playClick();
+      }
     }
-    if (key === 'hapticEnabled') {
-      hapticManager.setEnabled(value);
-      if (value) hapticManager.lightTap();
+    if (key === "hapticEnabled") {
+      if (typeof value === "boolean") {
+        hapticManager.setEnabled(value);
+        if (value) hapticManager.lightTap();
+      }
     }
   };
 
@@ -42,7 +60,7 @@ export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChan
     gameStorage.saveSettings({
       soundEnabled: localSettings.soundEnabled,
       hapticEnabled: localSettings.hapticEnabled,
-      theme: 'dark',
+      theme: "dark",
       boardOrientation: localSettings.boardOrientation,
       showAnalysisArrows: localSettings.showAnalysisArrows,
       autoAnalysis: localSettings.autoAnalysis,
@@ -50,7 +68,16 @@ export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChan
     });
 
     // Apply to game settings
-    onSettingsChange(localSettings);
+    onSettingsChange({
+      mode: localSettings.mode,
+      boardOrientation: localSettings.boardOrientation,
+      humanColor: localSettings.humanColor,
+      aiColor: localSettings.aiColor,
+      aiDepth: localSettings.aiDepth,
+      showAnalysisArrows: localSettings.showAnalysisArrows,
+      autoAnalysis: localSettings.autoAnalysis,
+      analysisMode: localSettings.analysisMode,
+    });
     onClose();
   };
 
@@ -79,7 +106,9 @@ export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChan
         <div className="p-4 md:p-6 space-y-6">
           {/* Audio Settings */}
           <div>
-            <h3 className="text-lg font-medium text-white mb-3">🔊 Audio & Feedback</h3>
+            <h3 className="text-lg font-medium text-white mb-3">
+              🔊 Audio & Feedback
+            </h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-gray-300">Sound Effects</label>
@@ -94,7 +123,9 @@ export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChan
                   <input
                     type="checkbox"
                     checked={localSettings.soundEnabled}
-                    onChange={(e) => handleSettingChange('soundEnabled', e.target.checked)}
+                    onChange={(e) =>
+                      handleSettingChange("soundEnabled", e.target.checked)
+                    }
                     className="w-4 h-4 text-blue-600 rounded"
                   />
                 </div>
@@ -113,7 +144,9 @@ export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChan
                   <input
                     type="checkbox"
                     checked={localSettings.hapticEnabled}
-                    onChange={(e) => handleSettingChange('hapticEnabled', e.target.checked)}
+                    onChange={(e) =>
+                      handleSettingChange("hapticEnabled", e.target.checked)
+                    }
                     className="w-4 h-4 text-blue-600 rounded"
                   />
                 </div>
@@ -123,13 +156,20 @@ export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChan
 
           {/* Board Settings */}
           <div>
-            <h3 className="text-lg font-medium text-white mb-3">♟️ Board Settings</h3>
+            <h3 className="text-lg font-medium text-white mb-3">
+              ♟️ Board Settings
+            </h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-gray-300">Board Orientation</label>
                 <select
                   value={localSettings.boardOrientation}
-                  onChange={(e) => handleSettingChange('boardOrientation', e.target.value)}
+                  onChange={(e) =>
+                    handleSettingChange(
+                      "boardOrientation",
+                      e.target.value as GameSettings["boardOrientation"],
+                    )
+                  }
                   className="bg-gray-700 text-white rounded px-2 py-1"
                 >
                   <option value="white">White</option>
@@ -142,7 +182,9 @@ export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChan
                 <input
                   type="checkbox"
                   checked={localSettings.showAnalysisArrows}
-                  onChange={(e) => handleSettingChange('showAnalysisArrows', e.target.checked)}
+                  onChange={(e) =>
+                    handleSettingChange("showAnalysisArrows", e.target.checked)
+                  }
                   className="w-4 h-4 text-blue-600 rounded"
                 />
               </div>
@@ -152,7 +194,9 @@ export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChan
                 <input
                   type="checkbox"
                   checked={localSettings.autoAnalysis}
-                  onChange={(e) => handleSettingChange('autoAnalysis', e.target.checked)}
+                  onChange={(e) =>
+                    handleSettingChange("autoAnalysis", e.target.checked)
+                  }
                   className="w-4 h-4 text-blue-600 rounded"
                 />
               </div>
@@ -161,7 +205,9 @@ export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChan
 
           {/* AI Settings */}
           <div>
-            <h3 className="text-lg font-medium text-white mb-3">🤖 AI Settings</h3>
+            <h3 className="text-lg font-medium text-white mb-3">
+              🤖 AI Settings
+            </h3>
             <div>
               <label className="block text-gray-300 mb-2">
                 AI Depth: {localSettings.aiDepth}
@@ -171,7 +217,9 @@ export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChan
                 min="1"
                 max="15"
                 value={localSettings.aiDepth}
-                onChange={(e) => handleSettingChange('aiDepth', parseInt(e.target.value))}
+                onChange={(e) =>
+                  handleSettingChange("aiDepth", parseInt(e.target.value))
+                }
                 className="w-full"
               />
               <div className="flex justify-between text-xs text-gray-400 mt-1">
@@ -192,7 +240,9 @@ export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChan
               </div>
               <div className="flex justify-between">
                 <span>Auto-save:</span>
-                <span>{gameStorage.getAutoSavedGame() ? 'Available' : 'None'}</span>
+                <span>
+                  {gameStorage.getAutoSavedGame() ? "Available" : "None"}
+                </span>
               </div>
             </div>
           </div>
@@ -215,4 +265,4 @@ export function SettingsModal({ isOpen, onClose, currentSettings, onSettingsChan
       </div>
     </div>
   );
-} 
+}

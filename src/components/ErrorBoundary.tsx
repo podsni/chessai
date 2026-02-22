@@ -1,4 +1,4 @@
-import React, { Component, ReactNode } from 'react';
+import React, { Component, ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
@@ -20,7 +20,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Chess App Error:', error, errorInfo);
+    console.error("Chess App Error:", error, errorInfo);
   }
 
   render() {
@@ -29,9 +29,12 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white p-4">
           <div className="max-w-md w-full text-center">
             <div className="text-6xl mb-4">♔</div>
-            <h1 className="text-2xl font-bold mb-4">Oops! Something went wrong</h1>
+            <h1 className="text-2xl font-bold mb-4">
+              Oops! Something went wrong
+            </h1>
             <p className="text-gray-300 mb-6">
-              The chess application encountered an error. Please refresh the page to continue.
+              The chess application encountered an error. Please refresh the
+              page to continue.
             </p>
             <button
               onClick={() => window.location.reload()}
@@ -41,7 +44,9 @@ export class ErrorBoundary extends Component<Props, State> {
             </button>
             {this.state.error && (
               <details className="mt-6 text-left bg-gray-800 rounded p-4">
-                <summary className="cursor-pointer text-sm text-gray-400">Technical Details</summary>
+                <summary className="cursor-pointer text-sm text-gray-400">
+                  Technical Details
+                </summary>
                 <pre className="text-xs mt-2 text-red-300 overflow-auto">
                   {this.state.error.message}
                 </pre>
@@ -54,4 +59,4 @@ export class ErrorBoundary extends Component<Props, State> {
 
     return this.props.children;
   }
-} 
+}

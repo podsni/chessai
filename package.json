@@ -1,7 +1,7 @@
 {
   "name": "chessbot-analysis",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,14 +9,20 @@
     "build:bun": "bun run build",
     "build:analyze": "bun run build && bunx vite-bundle-analyzer dist/stats.html",
     "build:production": "NODE_ENV=production bun run build",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "typecheck": "tsgo -p tsconfig.json",
+    "type-check": "bun run typecheck",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint . --fix",
+    "fmt": "oxfmt .",
+    "fmt:check": "oxfmt --check .",
+    "check:fast": "bun run lint && bun run fmt:check",
+    "check": "bun run typecheck && bun run lint && bun run fmt:check",
+    "fix": "bun run lint:fix && bun run fmt",
     "preview": "vite preview",
     "preview:bun": "bun run preview",
     "start": "bun run dev",
     "test:build": "bun run build && bun run preview",
-    "clean": "rm -rf dist node_modules/.vite",
-    "type-check": "tsc --noEmit"
+    "clean": "rm -rf dist node_modules/.vite"
   },
   "dependencies": {
     "chess.js": "^1.4.0",
@@ -26,6 +32,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
+    "@nkzw/oxlint-config": "^1.0.1",
+    "@oxlint/migrate": "^1.49.0",
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/postcss": "^4.1.10",
     "@types/react": "^19.1.2",

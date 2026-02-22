@@ -1,42 +1,37 @@
-import { ChessBoard } from './ChessBoard';
-import { GameControls } from './GameControls';
-import { SettingsModal } from './SettingsModal';
-import { FenDisplay } from './FenDisplay';
-import { MoveNotation } from './MoveNotation';
-import { PgnLoadModal } from './PgnLoadModal';
-import { useChessBot } from '../hooks/useChessBot';
-import { useState, useEffect } from 'react';
+import { ChessBoard } from "./ChessBoard";
+import { GameControls } from "./GameControls";
+import { SettingsModal } from "./SettingsModal";
+import { FenDisplay } from "./FenDisplay";
+import { MoveNotation } from "./MoveNotation";
+import { PgnLoadModal } from "./PgnLoadModal";
+import { useChessBot } from "../hooks/useChessBot";
+import { useState, useEffect } from "react";
+import type { PersistedGameState } from "../types/chess";
 
 interface ChessBotProps {
   tabId?: string;
   tabName?: string;
-  initialGameState?: {
-    fen: string;
-    pgn: string;
-    moveHistory: string[];
-    settings: any;
-    lastMove: string | null;
-  };
-  onGameStateChange?: (gameState: any) => void;
+  initialGameState?: PersistedGameState;
+  onGameStateChange?: (gameState: PersistedGameState) => void;
   onRename?: (newName: string) => void;
 }
 
-export function ChessBot({ 
-  tabId, 
+export function ChessBot({
+  tabId,
   tabName,
-  initialGameState, 
-  onGameStateChange, 
-  onRename 
+  initialGameState,
+  onGameStateChange,
+  onRename,
 }: ChessBotProps = {}) {
   const [isMobile, setIsMobile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showPgnModal, setShowPgnModal] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
-  const [tempName, setTempName] = useState('');
+  const [tempName, setTempName] = useState("");
 
   useEffect(() => {
     const checkMobile = () => {
-      return window.innerWidth < 768 || 'ontouchstart' in window;
+      return window.innerWidth < 768 || "ontouchstart" in window;
     };
     setIsMobile(checkMobile());
 
@@ -44,8 +39,8 @@ export function ChessBot({
       setIsMobile(checkMobile());
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const {
@@ -76,13 +71,15 @@ export function ChessBot({
   } = useChessBot(initialGameState, onGameStateChange);
 
   // Determine if pieces should be draggable
-  const arePiecesDraggable = settings.analysisMode || 
-    (settings.mode === 'human-vs-human') ||
-    (settings.mode === 'human-vs-ai' && chess.turn() === settings.humanColor[0]);
+  const arePiecesDraggable =
+    settings.analysisMode ||
+    settings.mode === "human-vs-human" ||
+    (settings.mode === "human-vs-ai" &&
+      chess.turn() === settings.humanColor[0]);
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
-            {/* Header */}
+    <div className="min-h-screen" style={{ background: "var(--bg-primary)" }}>
+      {/* Header */}
       <header className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 border-b border-gray-700 shadow-lg">
         <div className="container mx-auto px-2 py-3 md:px-4 md:py-6">
           <div className="flex items-center justify-between">
@@ -102,12 +99,12 @@ export function ChessBot({
                         setIsRenaming(false);
                       }}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
+                        if (e.key === "Enter") {
                           if (tempName.trim()) {
                             onRename(tempName.trim());
                           }
                           setIsRenaming(false);
-                        } else if (e.key === 'Escape') {
+                        } else if (e.key === "Escape") {
                           setIsRenaming(false);
                         }
                       }}
@@ -115,22 +112,28 @@ export function ChessBot({
                       autoFocus
                     />
                   ) : (
-                    <h1 
+                    <h1
                       className="text-base md:text-3xl font-bold text-white cursor-pointer hover:text-blue-300 transition-colors truncate"
                       onClick={() => {
-                        setTempName(tabName || 'Chess Bot Analysis');
+                        setTempName(tabName || "Chess Bot Analysis");
                         setIsRenaming(true);
                       }}
                       title="Click to rename tab"
                     >
-                      {tabName || 'Chess Bot Analysis'}
+                      {tabName || "Chess Bot Analysis"}
                     </h1>
                   )
                 ) : (
-                  <h1 className="text-base md:text-3xl font-bold text-white truncate">Chess Bot Analysis</h1>
+                  <h1 className="text-base md:text-3xl font-bold text-white truncate">
+                    Chess Bot Analysis
+                  </h1>
                 )}
-                <p className="text-gray-300 text-xs md:text-sm hidden sm:block">Advanced Chess Analysis with AI • Drag & Drop Enabled</p>
-                <p className="text-gray-300 text-xs sm:hidden">Chess AI • Touch Enabled</p>
+                <p className="text-gray-300 text-xs md:text-sm hidden sm:block">
+                  Advanced Chess Analysis with AI • Drag & Drop Enabled
+                </p>
+                <p className="text-gray-300 text-xs sm:hidden">
+                  Chess AI • Touch Enabled
+                </p>
               </div>
               <span className="text-xl md:text-4xl flex-shrink-0">♚</span>
             </div>
@@ -161,12 +164,15 @@ export function ChessBot({
         <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border-b border-blue-500/30 px-2 py-2 md:px-3 md:py-2">
           <div className="text-center">
             <p className="text-blue-300 text-xs leading-relaxed">
-              💡 <strong>Touch Tips:</strong> Tap piece → Tap destination or drag pieces to move
+              💡 <strong>Touch Tips:</strong> Tap piece → Tap destination or
+              drag pieces to move
             </p>
             {selectedSquare && (
               <div className="mt-2 bg-yellow-500/20 rounded-lg px-3 py-1 inline-block">
                 <p className="text-yellow-300 text-xs font-medium">
-                  ✨ Selected: <strong className="text-yellow-100">{selectedSquare}</strong> → Tap green square to move
+                  ✨ Selected:{" "}
+                  <strong className="text-yellow-100">{selectedSquare}</strong>{" "}
+                  → Tap green square to move
                 </p>
               </div>
             )}
@@ -201,32 +207,43 @@ export function ChessBot({
                     </span>
                   )}
                 </h2>
-                <div className="flex items-center gap-2 text-xs md:text-sm" style={{ color: 'var(--text-light)' }}>
+                <div
+                  className="flex items-center gap-2 text-xs md:text-sm"
+                  style={{ color: "var(--text-light)" }}
+                >
                   <div className="flex items-center gap-2">
                     <span>Human:</span>
-                    <span className={`font-medium px-2 py-1 rounded text-xs ${settings.humanColor === 'white' ? 'bg-gray-100 text-black' : 'bg-gray-800 text-white'}`}>
-                      {settings.humanColor === 'white' ? '♔' : '♚'} {settings.humanColor}
+                    <span
+                      className={`font-medium px-2 py-1 rounded text-xs ${settings.humanColor === "white" ? "bg-gray-100 text-black" : "bg-gray-800 text-white"}`}
+                    >
+                      {settings.humanColor === "white" ? "♔" : "♚"}{" "}
+                      {settings.humanColor}
                     </span>
                   </div>
-                  {settings.mode === 'human-vs-ai' && (
+                  {settings.mode === "human-vs-ai" && (
                     <div className="flex items-center gap-2">
                       <span>AI:</span>
-                      <span className={`font-medium px-2 py-1 rounded text-xs ${settings.aiColor === 'white' ? 'bg-gray-100 text-black' : 'bg-gray-800 text-white'}`}>
-                        {settings.aiColor === 'white' ? '♔' : '♚'} {settings.aiColor}
+                      <span
+                        className={`font-medium px-2 py-1 rounded text-xs ${settings.aiColor === "white" ? "bg-gray-100 text-black" : "bg-gray-800 text-white"}`}
+                      >
+                        {settings.aiColor === "white" ? "♔" : "♚"}{" "}
+                        {settings.aiColor}
                       </span>
                     </div>
                   )}
                 </div>
               </div>
-              
+
               <ChessBoard
                 chess={chess}
                 onSquareClick={handleSquareClick}
                 onPieceDrop={handlePieceDrop}
                 selectedSquare={selectedSquare}
                 availableMoves={availableMoves}
-                isFlipped={settings.boardOrientation === 'black'}
-                analysisArrows={settings.showAnalysisArrows ? analysisArrows : []}
+                isFlipped={settings.boardOrientation === "black"}
+                analysisArrows={
+                  settings.showAnalysisArrows ? analysisArrows : []
+                }
                 arePiecesDraggable={arePiecesDraggable}
                 humanColor={settings.humanColor}
                 aiColor={settings.aiColor}
@@ -235,9 +252,9 @@ export function ChessBot({
 
               {/* Quick Actions */}
               <div className="mt-4 flex flex-wrap gap-2 justify-center">
-                <button 
-                  onClick={handleGetHint} 
-                  className={`chess-button flex-1 sm:flex-none min-h-[44px] touch-manipulation ${isThinking ? 'pulse' : ''}`}
+                <button
+                  onClick={handleGetHint}
+                  className={`chess-button flex-1 sm:flex-none min-h-[44px] touch-manipulation ${isThinking ? "pulse" : ""}`}
                   disabled={isThinking}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -246,13 +263,17 @@ export function ChessBot({
                     ) : (
                       <span>💡</span>
                     )}
-                    <span className="hidden sm:inline">{isThinking ? 'Thinking...' : 'Get Hint'}</span>
-                    <span className="sm:hidden text-xs">{isThinking ? '...' : 'Hint'}</span>
+                    <span className="hidden sm:inline">
+                      {isThinking ? "Thinking..." : "Get Hint"}
+                    </span>
+                    <span className="sm:hidden text-xs">
+                      {isThinking ? "..." : "Hint"}
+                    </span>
                   </div>
                 </button>
-                <button 
-                  onClick={handleAnalyzePosition} 
-                  className={`chess-button flex-1 sm:flex-none min-h-[44px] touch-manipulation ${isThinking ? 'pulse' : ''}`}
+                <button
+                  onClick={handleAnalyzePosition}
+                  className={`chess-button flex-1 sm:flex-none min-h-[44px] touch-manipulation ${isThinking ? "pulse" : ""}`}
                   disabled={isThinking}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -261,12 +282,16 @@ export function ChessBot({
                     ) : (
                       <span>📊</span>
                     )}
-                    <span className="hidden sm:inline">{isThinking ? 'Analyzing...' : 'Analyze'}</span>
-                    <span className="sm:hidden text-xs">{isThinking ? '...' : 'Analyze'}</span>
+                    <span className="hidden sm:inline">
+                      {isThinking ? "Analyzing..." : "Analyze"}
+                    </span>
+                    <span className="sm:hidden text-xs">
+                      {isThinking ? "..." : "Analyze"}
+                    </span>
                   </div>
                 </button>
-                <button 
-                  onClick={handleFlipBoard} 
+                <button
+                  onClick={handleFlipBoard}
                   className="chess-button secondary flex-1 sm:flex-none min-h-[44px] touch-manipulation"
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -275,8 +300,8 @@ export function ChessBot({
                     <span className="sm:hidden text-xs">Flip</span>
                   </div>
                 </button>
-                <button 
-                  onClick={handleUndo} 
+                <button
+                  onClick={handleUndo}
                   className="chess-button secondary flex-1 sm:flex-none min-h-[44px] touch-manipulation"
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -295,7 +320,9 @@ export function ChessBot({
                       <div className="text-yellow-300 font-medium">
                         <div className="flex items-center justify-center gap-1">
                           <span>📍</span>
-                          <span>Selected: <strong>{selectedSquare}</strong></span>
+                          <span>
+                            Selected: <strong>{selectedSquare}</strong>
+                          </span>
                         </div>
                         <div className="text-gray-400 mt-1">
                           Available moves: {availableMoves.length}
@@ -313,15 +340,12 @@ export function ChessBot({
 
               {/* Move Notation and FEN Display */}
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <MoveNotation 
+                <MoveNotation
                   lastMove={moveHistory[moveHistory.length - 1] || null}
                   moveNumber={chess.moveNumber()}
                   currentTurn={chess.turn()}
                 />
-                <FenDisplay 
-                  fen={chess.fen()} 
-                  showLabel={!isMobile}
-                />
+                <FenDisplay fen={chess.fen()} showLabel={!isMobile} />
               </div>
 
               {/* Analysis Display */}
@@ -330,26 +354,33 @@ export function ChessBot({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     {analysis && (
                       <div>
-                        <h4 className="text-xs md:text-sm font-medium text-gray-300 mb-2">Position Analysis</h4>
+                        <h4 className="text-xs md:text-sm font-medium text-gray-300 mb-2">
+                          Position Analysis
+                        </h4>
                         <div className="text-base md:text-lg font-bold text-white">
-                          {analysis.mate !== null && analysis.mate !== undefined 
-                            ? `M${Math.abs(analysis.mate)}` 
-                            : analysis.evaluation !== null && analysis.evaluation !== undefined
-                            ? `${analysis.evaluation > 0 ? '+' : ''}${(analysis.evaluation / 100).toFixed(2)}`
-                            : '—'
-                          }
+                          {analysis.mate !== null && analysis.mate !== undefined
+                            ? `M${Math.abs(analysis.mate)}`
+                            : analysis.evaluation !== null &&
+                                analysis.evaluation !== undefined
+                              ? `${analysis.evaluation > 0 ? "+" : ""}${(analysis.evaluation / 100).toFixed(2)}`
+                              : "—"}
                         </div>
                         {analysis.bestmove && (
                           <div className="text-xs md:text-sm text-gray-300 mt-1">
-                            Best: <span className="font-mono text-green-400">{analysis.bestmove}</span>
+                            Best:{" "}
+                            <span className="font-mono text-green-400">
+                              {analysis.bestmove}
+                            </span>
                           </div>
                         )}
                       </div>
                     )}
-                    
+
                     {hintMove && (
                       <div>
-                        <h4 className="text-xs md:text-sm font-medium text-gray-300 mb-2">Hint</h4>
+                        <h4 className="text-xs md:text-sm font-medium text-gray-300 mb-2">
+                          Hint
+                        </h4>
                         <div className="text-base md:text-lg font-bold text-yellow-400">
                           {hintMove}
                         </div>
@@ -400,7 +431,10 @@ export function ChessBot({
           <div className="text-center">
             <p className="text-gray-400 text-xs md:text-sm leading-relaxed">
               Chess Bot Analysis • Powered by Stockfish
-              <span className="hidden md:inline"> • Built with React & TypeScript</span>
+              <span className="hidden md:inline">
+                {" "}
+                • Built with React & TypeScript
+              </span>
             </p>
             <div className="flex justify-center items-center gap-1 md:gap-4 mt-2 flex-wrap text-xs">
               <span className="text-gray-500 hidden md:inline">Features:</span>
@@ -437,4 +471,4 @@ export function ChessBot({
       />
     </div>
   );
-} 
+}

@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { soundManager } from '../services/soundManager';
-import { hapticManager } from '../services/hapticManager';
+import { useState } from "react";
+import { soundManager } from "../services/soundManager";
+import { hapticManager } from "../services/hapticManager";
 
 interface FenDisplayProps {
   fen: string;
@@ -8,7 +8,11 @@ interface FenDisplayProps {
   showLabel?: boolean;
 }
 
-export function FenDisplay({ fen, className = '', showLabel = true }: FenDisplayProps) {
+export function FenDisplay({
+  fen,
+  className = "",
+  showLabel = true,
+}: FenDisplayProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopyFen = async () => {
@@ -17,56 +21,58 @@ export function FenDisplay({ fen, className = '', showLabel = true }: FenDisplay
       setCopied(true);
       soundManager.playClick();
       hapticManager.lightTap();
-      
+
       // Reset copied state after 2 seconds
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error('Failed to copy FEN:', error);
+      console.error("Failed to copy FEN:", error);
       soundManager.playError();
       hapticManager.errorPattern();
-      
+
       // Fallback for older browsers
       try {
-        const textArea = document.createElement('textarea');
+        const textArea = document.createElement("textarea");
         textArea.value = fen;
         document.body.appendChild(textArea);
         textArea.select();
-        document.execCommand('copy');
+        document.execCommand("copy");
         document.body.removeChild(textArea);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-      } catch (fallbackError) {
-        alert('Copy failed. Please copy manually: ' + fen);
+      } catch {
+        alert("Copy failed. Please copy manually: " + fen);
       }
     }
   };
 
   return (
-    <div className={`bg-gray-800 rounded-lg border border-gray-600 ${className}`}>
+    <div
+      className={`bg-gray-800 rounded-lg border border-gray-600 ${className}`}
+    >
       <div className="p-3 md:p-4">
         {showLabel && (
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-medium text-gray-300">Current Position (FEN)</h4>
+            <h4 className="text-sm font-medium text-gray-300">
+              Current Position (FEN)
+            </h4>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-400">Real-time</span>
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
             </div>
           </div>
         )}
-        
+
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="flex-1 bg-gray-700 rounded p-2 font-mono text-xs text-white overflow-auto">
-            <div className="break-all select-all">
-              {fen}
-            </div>
+            <div className="break-all select-all">{fen}</div>
           </div>
-          
+
           <button
             onClick={handleCopyFen}
             className={`px-3 py-2 rounded text-sm font-medium transition-all duration-200 ${
               copied
-                ? 'bg-green-600 text-white'
-                : 'bg-blue-600 hover:bg-blue-700 text-white'
+                ? "bg-green-600 text-white"
+                : "bg-blue-600 hover:bg-blue-700 text-white"
             }`}
             title="Copy FEN to clipboard"
           >
@@ -83,7 +89,7 @@ export function FenDisplay({ fen, className = '', showLabel = true }: FenDisplay
             )}
           </button>
         </div>
-        
+
         {/* FEN breakdown for educational purposes */}
         <div className="mt-3 text-xs text-gray-400">
           <details className="cursor-pointer">
@@ -103,4 +109,4 @@ export function FenDisplay({ fen, className = '', showLabel = true }: FenDisplay
       </div>
     </div>
   );
-} 
+}

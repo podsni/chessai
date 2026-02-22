@@ -3,16 +3,16 @@ class HapticManager {
 
   constructor() {
     // Check if device supports haptic feedback
-    this.enabled = 'vibrate' in navigator;
+    this.enabled = "vibrate" in navigator;
   }
 
   private vibrate(pattern: number | number[]): void {
     if (!this.enabled || !navigator.vibrate) return;
-    
+
     try {
       navigator.vibrate(pattern);
     } catch (error) {
-      console.warn('Haptic feedback not supported:', error);
+      console.warn("Haptic feedback not supported:", error);
     }
   }
 
@@ -52,7 +52,7 @@ class HapticManager {
   }
 
   setEnabled(enabled: boolean): void {
-    this.enabled = enabled && 'vibrate' in navigator;
+    this.enabled = enabled && "vibrate" in navigator;
   }
 
   isEnabled(): boolean {
@@ -60,4 +60,4 @@ class HapticManager {
   }
 }
 
-export const hapticManager = new HapticManager(); 
+export const hapticManager = new HapticManager();

@@ -1,13 +1,30 @@
-export class StockfishAPI {
-  private baseUrl = 'https://stockfish.online/api/s/v2.php';
+interface StockfishApiResponse {
+  success: boolean;
+  evaluation?: number;
+  mate?: number;
+  bestmove?: string;
+  continuation?: string;
+}
 
-  async getAnalysis(fen: string, depth: number): Promise<any> {
+interface TopMove {
+  move: string | null;
+  evaluation?: number;
+  mate?: number;
+  rank: number;
+}
+
+export class StockfishAPI {
+  private baseUrl = "https://stockfish.online/api/s/v2.php";
+
+  async getAnalysis(fen: string, depth: number): Promise<StockfishApiResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}?fen=${encodeURIComponent(fen)}&depth=${depth}`);
-      const data = await response.json();
-      
+      const response = await fetch(
+        `${this.baseUrl}?fen=${encodeURIComponent(fen)}&depth=${depth}`,
+      );
+      const data = (await response.json()) as StockfishApiResponse;
+
       if (!data.success) {
-        throw new Error('Analysis failed');
+        throw new Error("Analysis failed");
       }
 
       // Transform the API response to match our interface
@@ -16,10 +33,10 @@ export class StockfishAPI {
         evaluation: data.evaluation || undefined,
         mate: data.mate || undefined,
         bestmove: data.bestmove || undefined, // Keep original field name
-        continuation: data.continuation || undefined
+        continuation: data.continuation || undefined,
       };
     } catch (error) {
-      console.error('Error fetching analysis:', error);
+      console.error("Error fetching analysis:", error);
       throw error;
     }
   }
@@ -27,25 +44,27 @@ export class StockfishAPI {
   async getBestMove(fen: string, depth: number): Promise<string | null> {
     try {
       const data = await this.getAnalysis(fen, depth);
-      
+
       if (!data.bestmove) {
         return null;
       }
 
       return this.extractMoveFromString(data.bestmove);
     } catch (error) {
-      console.error('Error getting best move:', error);
+      console.error("Error getting best move:", error);
       return null;
     }
   }
 
   extractMoveFromString(bestMoveString: string): string | null {
-    if (!bestMoveString || bestMoveString === 'none') {
+    if (!bestMoveString || bestMoveString === "none") {
       return null;
     }
 
     // Extract just the move part (e.g., "bestmove e2e4" -> "e2e4")
-    const moveMatch = bestMoveString.match(/(?:bestmove\s+)?([a-h][1-8][a-h][1-8][qrbn]?)/);
+    const moveMatch = bestMoveString.match(
+      /(?:bestmove\s+)?([a-h][1-8][a-h][1-8][qrbn]?)/,
+    );
     if (!moveMatch) {
       return null;
     }
@@ -53,7 +72,9 @@ export class StockfishAPI {
     return moveMatch[1]; // Return the raw move string like "e2e4"
   }
 
-  parseBestMove(bestMoveString: string): { from: string; to: string; promotion?: string } | null {
+  parseBestMove(
+    bestMoveString: string,
+  ): { from: string; to: string; promotion?: string } | null {
     const moveStr = this.extractMoveFromString(bestMoveString);
     if (!moveStr) {
       return null;
@@ -70,22 +91,27 @@ export class StockfishAPI {
     if (mate !== null && mate !== undefined) {
       return mate > 0 ? `Mate in ${mate}` : `Mate in ${Math.abs(mate)}`;
     }
-    
+
     if (evaluation !== undefined) {
-      const evalStr = evaluation > 0 ? `+${evaluation.toFixed(2)}` : evaluation.toFixed(2);
+      const evalStr =
+        evaluation > 0 ? `+${evaluation.toFixed(2)}` : evaluation.toFixed(2);
       return `Eval: ${evalStr}`;
     }
-    
-    return 'No evaluation';
+
+    return "No evaluation";
   }
 
   // Get multiple best moves for prediction display
-  async getTopMoves(fen: string, depth: number, _count: number = 3): Promise<any[]> {
+  async getTopMoves(
+    fen: string,
+    depth: number,
+    _count: number = 3,
+  ): Promise<TopMove[]> {
     try {
       const data = await this.getAnalysis(fen, depth);
-      
+
       const moves = [];
-      
+
       // Add the best move
       if (data.bestmove) {
         const parsedMove = this.parseBestMove(data.bestmove);
@@ -94,7 +120,7 @@ export class StockfishAPI {
             move: this.extractMoveFromString(data.bestmove),
             evaluation: data.evaluation,
             mate: data.mate,
-            rank: 1
+            rank: 1,
           });
         }
       }
@@ -103,8 +129,8 @@ export class StockfishAPI {
       // In a real implementation, you'd get multiple moves
       return moves;
     } catch (error) {
-      console.error('Error getting top moves:', error);
+      console.error("Error getting top moves:", error);
       return [];
     }
   }
-} 
+}

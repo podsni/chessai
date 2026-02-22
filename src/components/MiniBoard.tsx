@@ -1,6 +1,6 @@
-import { Chess, Square } from 'chess.js';
-import { Chessboard } from 'react-chessboard';
-import { useState, useEffect } from 'react';
+import { Chess, Square } from "chess.js";
+import { Chessboard } from "react-chessboard";
+import { useState, useEffect } from "react";
 
 interface MiniBoardProps {
   fen: string;
@@ -9,17 +9,17 @@ interface MiniBoardProps {
   mate?: number | null;
   title: string;
   size?: number;
-  boardOrientation?: 'white' | 'black';
+  boardOrientation?: "white" | "black";
 }
 
-export function MiniBoard({ 
-  fen, 
-  bestMove, 
-  evaluation, 
-  mate, 
-  title, 
+export function MiniBoard({
+  fen,
+  bestMove,
+  evaluation,
+  mate,
+  title,
   size,
-  boardOrientation = 'white'
+  boardOrientation = "white",
 }: MiniBoardProps) {
   const [boardSize, setBoardSize] = useState(size || 180);
 
@@ -32,7 +32,7 @@ export function MiniBoard({
 
     const calculateMiniSize = () => {
       const screenWidth = window.innerWidth;
-      
+
       // Mobile portrait
       if (screenWidth < 480) {
         return 140;
@@ -59,14 +59,14 @@ export function MiniBoard({
       }
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, [size]);
 
   // Create a temporary chess instance to show the predicted position
   const tempChess = new Chess(fen);
   let predictedFen = fen;
-  
+
   // If we have a best move, apply it to show the predicted position
   if (bestMove) {
     try {
@@ -75,7 +75,7 @@ export function MiniBoard({
         predictedFen = tempChess.fen();
       }
     } catch (error) {
-      console.error('Error applying best move:', error);
+      console.error("Error applying best move:", error);
     }
   }
 
@@ -87,25 +87,29 @@ export function MiniBoard({
       const evalValue = evaluation / 100;
       return evalValue > 0 ? `+${evalValue.toFixed(2)}` : evalValue.toFixed(2);
     }
-    return '—';
+    return "—";
   };
 
   // Create arrows for the best move
-  const customArrows = bestMove ? (() => {
-    if (bestMove.length >= 4) {
-      const from = bestMove.substring(0, 2) as Square;
-      const to = bestMove.substring(2, 4) as Square;
-      return [[from, to]] as [Square, Square][];
-    }
-    return [];
-  })() : [];
+  const customArrows = bestMove
+    ? (() => {
+        if (bestMove.length >= 4) {
+          const from = bestMove.substring(0, 2) as Square;
+          const to = bestMove.substring(2, 4) as Square;
+          return [[from, to]] as [Square, Square][];
+        }
+        return [];
+      })()
+    : [];
 
   return (
     <div className="mini-board-container w-full flex justify-center">
       <div className="bg-gray-800 rounded-lg p-2 md:p-3 border border-gray-600 w-full max-w-xs">
         {/* Title and Evaluation */}
         <div className="flex items-center justify-between mb-2">
-          <h4 className="text-xs md:text-sm font-medium text-white truncate pr-2">{title}</h4>
+          <h4 className="text-xs md:text-sm font-medium text-white truncate pr-2">
+            {title}
+          </h4>
           <div className="text-xs md:text-sm font-bold text-green-400 flex-shrink-0">
             {formatEvaluation()}
           </div>
@@ -114,7 +118,7 @@ export function MiniBoard({
         {/* Mini Chess Board */}
         <div className="relative flex justify-center">
           <Chessboard
-            id={`mini-board-${title.replace(/\s+/g, '-').toLowerCase()}`}
+            id={`mini-board-${title.replace(/\s+/g, "-").toLowerCase()}`}
             position={predictedFen}
             boardWidth={boardSize}
             boardOrientation={boardOrientation}
@@ -123,15 +127,15 @@ export function MiniBoard({
             customArrows={customArrows}
             customArrowColor="#7fb069"
             customBoardStyle={{
-              borderRadius: boardSize < 160 ? '3px' : '4px',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
-              border: '1px solid #8b7355'
+              borderRadius: boardSize < 160 ? "3px" : "4px",
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
+              border: "1px solid #8b7355",
             }}
             customDarkSquareStyle={{
-              backgroundColor: '#b58863'
+              backgroundColor: "#b58863",
             }}
             customLightSquareStyle={{
-              backgroundColor: '#f0d9b5'
+              backgroundColor: "#f0d9b5",
             }}
           />
         </div>
@@ -140,7 +144,10 @@ export function MiniBoard({
         {bestMove && (
           <div className="mt-2 text-center">
             <div className="text-xs text-gray-300">
-              Best: <span className="font-mono text-yellow-400 text-xs">{bestMove}</span>
+              Best:{" "}
+              <span className="font-mono text-yellow-400 text-xs">
+                {bestMove}
+              </span>
             </div>
           </div>
         )}
@@ -154,4 +161,4 @@ export function MiniBoard({
       </div>
     </div>
   );
-} 
+}

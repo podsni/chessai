@@ -5,27 +5,41 @@ class SoundManager {
 
   constructor() {
     // Check if user prefers reduced motion (also often correlates with reduced audio)
-    if (typeof window !== 'undefined') {
-      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (typeof window !== "undefined") {
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
       this.enabled = !prefersReducedMotion;
     }
   }
 
   private getAudioContext(): AudioContext | null {
-    if (!this.audioContext && typeof window !== 'undefined') {
+    if (!this.audioContext && typeof window !== "undefined") {
       try {
-        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const extendedWindow = window as Window & {
+          webkitAudioContext?: typeof AudioContext;
+        };
+        const AudioContextConstructor =
+          globalThis.AudioContext || extendedWindow.webkitAudioContext;
+        if (!AudioContextConstructor) {
+          return null;
+        }
+        this.audioContext = new AudioContextConstructor();
       } catch (error) {
-        console.warn('Audio not supported:', error);
+        console.warn("Audio not supported:", error);
         return null;
       }
     }
     return this.audioContext;
   }
 
-  private createTone(frequency: number, duration: number, type: OscillatorType = 'sine'): void {
+  private createTone(
+    frequency: number,
+    duration: number,
+    type: OscillatorType = "sine",
+  ): void {
     if (!this.enabled) return;
-    
+
     const audioContext = this.getAudioContext();
     if (!audioContext) return;
 
@@ -40,13 +54,19 @@ class SoundManager {
       oscillator.type = type;
 
       gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-      gainNode.gain.linearRampToValueAtTime(this.volume * 0.3, audioContext.currentTime + 0.01);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+      gainNode.gain.linearRampToValueAtTime(
+        this.volume * 0.3,
+        audioContext.currentTime + 0.01,
+      );
+      gainNode.gain.exponentialRampToValueAtTime(
+        0.01,
+        audioContext.currentTime + duration,
+      );
 
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + duration);
     } catch (error) {
-      console.warn('Error playing sound:', error);
+      console.warn("Error playing sound:", error);
     }
   }
 
@@ -58,8 +78,8 @@ class SoundManager {
 
   playCapture(): void {
     // More dramatic capture sound
-    this.createTone(400, 0.15, 'triangle');
-    setTimeout(() => this.createTone(300, 0.1, 'triangle'), 80);
+    this.createTone(400, 0.15, "triangle");
+    setTimeout(() => this.createTone(300, 0.1, "triangle"), 80);
   }
 
   playCheck(): void {
@@ -78,7 +98,7 @@ class SoundManager {
 
   playError(): void {
     // Error beep
-    this.createTone(200, 0.2, 'sawtooth');
+    this.createTone(200, 0.2, "sawtooth");
   }
 
   playClick(): void {
@@ -103,4 +123,4 @@ class SoundManager {
   }
 }
 
-export const soundManager = new SoundManager(); 
+export const soundManager = new SoundManager();

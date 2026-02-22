@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
-import { PGNParser, type PGNGameInfo } from '../services/pgnParser';
-import { Chess } from 'chess.js';
+import { useState, useRef } from "react";
+import { PGNParser, type PGNGameInfo } from "../services/pgnParser";
+import { Chess } from "chess.js";
 
 interface PgnLoadModalProps {
   isOpen: boolean;
@@ -8,8 +8,12 @@ interface PgnLoadModalProps {
   onLoadGame: (chess: Chess, gameInfo: PGNGameInfo) => void;
 }
 
-export function PgnLoadModal({ isOpen, onClose, onLoadGame }: PgnLoadModalProps) {
-  const [pgnText, setPgnText] = useState('');
+export function PgnLoadModal({
+  isOpen,
+  onClose,
+  onLoadGame,
+}: PgnLoadModalProps) {
+  const [pgnText, setPgnText] = useState("");
   const [parsedGames, setParsedGames] = useState<PGNGameInfo[]>([]);
   const [selectedGameIndex, setSelectedGameIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -32,20 +36,20 @@ export function PgnLoadModal({ isOpen, onClose, onLoadGame }: PgnLoadModalProps)
   const parsePGN = (text: string) => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const result = PGNParser.parsePGN(text);
-      
+
       if (result.success) {
         setParsedGames(result.games);
         setSelectedGameIndex(0);
         setError(null);
       } else {
-        setError(result.error || 'Failed to parse PGN');
+        setError(result.error || "Failed to parse PGN");
         setParsedGames([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      setError(err instanceof Error ? err.message : "Unknown error occurred");
       setParsedGames([]);
     } finally {
       setIsLoading(false);
@@ -63,15 +67,19 @@ export function PgnLoadModal({ isOpen, onClose, onLoadGame }: PgnLoadModalProps)
   };
 
   const loadSelectedGame = () => {
-    if (parsedGames.length === 0 || selectedGameIndex < 0 || selectedGameIndex >= parsedGames.length) {
+    if (
+      parsedGames.length === 0 ||
+      selectedGameIndex < 0 ||
+      selectedGameIndex >= parsedGames.length
+    ) {
       return;
     }
 
     const selectedGame = parsedGames[selectedGameIndex];
-    
+
     try {
       const chess = new Chess();
-      
+
       // Apply each move to the chess instance
       for (const move of selectedGame.moves) {
         try {
@@ -81,16 +89,18 @@ export function PgnLoadModal({ isOpen, onClose, onLoadGame }: PgnLoadModalProps)
           // Continue with other moves even if one fails
         }
       }
-      
+
       onLoadGame(chess, selectedGame);
       handleClose();
     } catch (err) {
-      setError(`Failed to load game: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(
+        `Failed to load game: ${err instanceof Error ? err.message : "Unknown error"}`,
+      );
     }
   };
 
   const handleClose = () => {
-    setPgnText('');
+    setPgnText("");
     setParsedGames([]);
     setSelectedGameIndex(0);
     setError(null);
@@ -98,12 +108,12 @@ export function PgnLoadModal({ isOpen, onClose, onLoadGame }: PgnLoadModalProps)
   };
 
   const clearAll = () => {
-    setPgnText('');
+    setPgnText("");
     setParsedGames([]);
     setSelectedGameIndex(0);
     setError(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
@@ -151,16 +161,16 @@ export function PgnLoadModal({ isOpen, onClose, onLoadGame }: PgnLoadModalProps)
                 <textarea
                   value={pgnText}
                   onChange={(e) => handleTextChange(e.target.value)}
-                  placeholder="Paste your PGN here, for example:
+                  placeholder='Paste your PGN here, for example:
 
-[Event &quot;Let's Play!&quot;]
-[Site &quot;Chess.com&quot;]
-[Date &quot;2025-06-16&quot;]
-[White &quot;imnub97&quot;]
-[Black &quot;HendaBangun&quot;]
-[Result &quot;*&quot;]
+[Event "Let&apos;s Play!"]
+[Site "Chess.com"]
+[Date "2025-06-16"]
+[White "imnub97"]
+[Black "HendaBangun"]
+[Result "*"]
 
-1. d4 d5 2. c4 dxc4 3. Nc3 e6 4. e4 e5 *"
+1. d4 d5 2. c4 dxc4 3. Nc3 e6 4. e4 e5 *'
                   className="w-full h-64 p-3 bg-gray-900 border border-gray-600 rounded text-white text-sm font-mono resize-none focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -192,7 +202,8 @@ export function PgnLoadModal({ isOpen, onClose, onLoadGame }: PgnLoadModalProps)
               {parsedGames.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold text-white mb-3">
-                    Found {parsedGames.length} game{parsedGames.length !== 1 ? 's' : ''}
+                    Found {parsedGames.length} game
+                    {parsedGames.length !== 1 ? "s" : ""}
                   </h3>
 
                   {parsedGames.length > 1 && (
@@ -202,12 +213,15 @@ export function PgnLoadModal({ isOpen, onClose, onLoadGame }: PgnLoadModalProps)
                       </label>
                       <select
                         value={selectedGameIndex}
-                        onChange={(e) => setSelectedGameIndex(parseInt(e.target.value))}
+                        onChange={(e) =>
+                          setSelectedGameIndex(parseInt(e.target.value))
+                        }
                         className="w-full p-2 bg-gray-900 border border-gray-600 rounded text-white focus:outline-none focus:border-blue-500"
                       >
                         {parsedGames.map((game, index) => (
                           <option key={index} value={index}>
-                            Game {index + 1}: {game.headers.White || 'Unknown'} vs {game.headers.Black || 'Unknown'}
+                            Game {index + 1}: {game.headers.White || "Unknown"}{" "}
+                            vs {game.headers.Black || "Unknown"}
                           </option>
                         ))}
                       </select>
@@ -218,35 +232,56 @@ export function PgnLoadModal({ isOpen, onClose, onLoadGame }: PgnLoadModalProps)
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-gray-400">Event:</span>
-                        <span className="text-white ml-2">{parsedGames[selectedGameIndex]?.headers.Event || 'Unknown'}</span>
+                        <span className="text-white ml-2">
+                          {parsedGames[selectedGameIndex]?.headers.Event ||
+                            "Unknown"}
+                        </span>
                       </div>
                       <div>
                         <span className="text-gray-400">Date:</span>
-                        <span className="text-white ml-2">{parsedGames[selectedGameIndex]?.headers.Date || 'Unknown'}</span>
+                        <span className="text-white ml-2">
+                          {parsedGames[selectedGameIndex]?.headers.Date ||
+                            "Unknown"}
+                        </span>
                       </div>
                       <div>
                         <span className="text-gray-400">White:</span>
-                        <span className="text-white ml-2">{parsedGames[selectedGameIndex]?.headers.White || 'Unknown'}</span>
+                        <span className="text-white ml-2">
+                          {parsedGames[selectedGameIndex]?.headers.White ||
+                            "Unknown"}
+                        </span>
                       </div>
                       <div>
                         <span className="text-gray-400">Black:</span>
-                        <span className="text-white ml-2">{parsedGames[selectedGameIndex]?.headers.Black || 'Unknown'}</span>
+                        <span className="text-white ml-2">
+                          {parsedGames[selectedGameIndex]?.headers.Black ||
+                            "Unknown"}
+                        </span>
                       </div>
                       <div>
                         <span className="text-gray-400">Result:</span>
-                        <span className="text-white ml-2">{parsedGames[selectedGameIndex]?.result || '*'}</span>
+                        <span className="text-white ml-2">
+                          {parsedGames[selectedGameIndex]?.result || "*"}
+                        </span>
                       </div>
                       <div>
                         <span className="text-gray-400">Moves:</span>
-                        <span className="text-white ml-2">{parsedGames[selectedGameIndex]?.moves.length || 0}</span>
+                        <span className="text-white ml-2">
+                          {parsedGames[selectedGameIndex]?.moves.length || 0}
+                        </span>
                       </div>
                     </div>
 
                     <div>
-                      <span className="text-gray-400 text-sm">First moves:</span>
+                      <span className="text-gray-400 text-sm">
+                        First moves:
+                      </span>
                       <div className="text-white text-sm mt-1 font-mono">
-                        {parsedGames[selectedGameIndex]?.moves.slice(0, 10).join(' ')}
-                        {parsedGames[selectedGameIndex]?.moves.length > 10 && '...'}
+                        {parsedGames[selectedGameIndex]?.moves
+                          .slice(0, 10)
+                          .join(" ")}
+                        {parsedGames[selectedGameIndex]?.moves.length > 10 &&
+                          "..."}
                       </div>
                     </div>
                   </div>
@@ -274,4 +309,4 @@ export function PgnLoadModal({ isOpen, onClose, onLoadGame }: PgnLoadModalProps)
       </div>
     </div>
   );
-} 
+}

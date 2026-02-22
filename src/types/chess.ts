@@ -1,8 +1,8 @@
-import { Chess, Square } from 'chess.js';
+import { Chess, Square } from "chess.js";
 
-export type GameMode = 'human-vs-ai' | 'ai-vs-ai' | 'human-vs-human';
-export type BoardOrientation = 'white' | 'black';
-export type PlayerColor = 'white' | 'black';
+export type GameMode = "human-vs-ai" | "ai-vs-ai" | "human-vs-human";
+export type BoardOrientation = "white" | "black";
+export type PlayerColor = "white" | "black";
 
 export interface GameSettings {
   mode: GameMode;
@@ -43,4 +43,12 @@ export interface AnalysisData {
   bestMove: string | null;
   arrows: AnalysisArrow[];
   pv: string[];
-} 
+}
+
+export interface PersistedGameState {
+  fen: string;
+  pgn: string;
+  moveHistory: string[];
+  settings: GameSettings;
+  lastMove: string | null;
+}
