@@ -387,7 +387,7 @@ body {
   }
 
   /* Stack grid items vertically on mobile */
-  .grid.lg\\:grid-cols-3 {
+  .dashboard-layout {
     grid-template-columns: 1fr !important;
   }
 
@@ -453,10 +453,6 @@ body {
   }
 
   /* Grid adjustments for smaller screens */
-  .grid.grid-cols-1.md\\:grid-cols-2 {
-    grid-template-columns: 1fr !important;
-  }
-
   .grid.grid-cols-2 {
     gap: 0.75rem;
   }
@@ -522,18 +518,18 @@ body {
   }
 
   /* Adjust analysis display */
-  .grid.grid-cols-1.md\\:grid-cols-2 {
+  .board-panel .grid {
     gap: 1rem;
   }
 }
 
 /* Landscape mobile adjustments */
 @media (max-width: 768px) and (orientation: landscape) {
-  .grid.lg\\:grid-cols-3 {
+  .dashboard-layout {
     grid-template-columns: 1fr 1fr !important;
   }
 
-  .lg\\:col-span-2 {
+  .dashboard-layout > :first-child {
     grid-column: span 1 / span 1 !important;
   }
 

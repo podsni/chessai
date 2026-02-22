@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { Chess, Square } from "chess.js";
+import { useQueryClient } from "@tanstack/react-query";
 import { StockfishAPI } from "../services/stockfishApi";
 import { soundManager } from "../services/soundManager";
 import { hapticManager } from "../services/hapticManager";
@@ -30,6 +31,7 @@ export const useChessBot = (
     }
     return newChess;
   });
+  const queryClient = useQueryClient();
 
   const [gameState, setGameState] = useState<GameState>({
     chess: chess,
@@ -170,22 +172,27 @@ export const useChessBot = (
           },
         ];
         setAnalysisArrows(arrows);
-        console.log("Created analysis arrows:", arrows); // Debug log
-      } else {
-        console.log("Failed to parse move:", bestMove); // Debug log
       }
     },
     [settings.showAnalysisArrows, parseMove],
   );
 
+  const getAnalysisCached = useCallback(
+    async (fen: string, depth: number) =>
+      queryClient.fetchQuery({
+        queryKey: ["stockfish-analysis", fen, depth],
+        queryFn: () => stockfishApi.getAnalysis(fen, depth),
+      }),
+    [queryClient],
+  );
+
   const handleAnalyzePosition = useCallback(async () => {
     setIsThinking(true);
     try {
-      const analysisResult = await stockfishApi.getAnalysis(
+      const analysisResult = await getAnalysisCached(
         chess.fen(),
         settings.aiDepth,
       );
-      console.log("Analysis result:", analysisResult); // Debug log
 
       setAnalysis(analysisResult);
 
@@ -193,7 +200,6 @@ export const useChessBot = (
         const cleanMove = stockfishApi.extractMoveFromString(
           analysisResult.bestmove,
         );
-        console.log("Extracted best move for arrows:", cleanMove); // Debug log
         createAnalysisArrows(cleanMove);
       }
     } catch (error) {
@@ -201,7 +207,7 @@ export const useChessBot = (
     } finally {
       setIsThinking(false);
     }
-  }, [chess, settings.aiDepth, createAnalysisArrows]);
+  }, [chess, settings.aiDepth, createAnalysisArrows, getAnalysisCached]);
 
   const makeMove = useCallback(
     (from: Square, to: Square) => {
@@ -250,8 +256,6 @@ export const useChessBot = (
           if (settings.autoAnalysis || settings.analysisMode) {
             setTimeout(() => handleAnalyzePosition(), 100);
           }
-
-          console.log("Move successful:", move.san);
           return true;
         }
       } catch (error) {
@@ -267,42 +271,22 @@ export const useChessBot = (
 
   const handleSquareClick = useCallback(
     (square: Square) => {
-      console.log(
-        "Square click handler:",
-        square,
-        "Game over:",
-        chess.isGameOver(),
-        "Analysis mode:",
-        settings.analysisMode,
-      );
-
       if (chess.isGameOver() && !settings.analysisMode) return;
       if (!isPlayerTurn() && !settings.analysisMode) return;
 
       const piece = chess.get(square);
-      console.log(
-        "Piece at square:",
-        piece,
-        "Selected square:",
-        selectedSquare,
-      );
 
       // If clicking the same square, deselect
       if (selectedSquare === square) {
-        console.log("Deselecting same square");
         clearSelection();
         return;
       }
 
       // If we have a selected square and this is a valid move
       if (selectedSquare && availableMoves.includes(square)) {
-        console.log("Attempting move from", selectedSquare, "to", square);
         const moveSuccessful = makeMove(selectedSquare, square);
         if (moveSuccessful) {
-          console.log("Move successful, clearing selection");
           clearSelection();
-        } else {
-          console.log("Move failed");
         }
       }
       // If clicking on a piece (more permissive for mobile)
@@ -313,23 +297,19 @@ export const useChessBot = (
           settings.analysisMode || piece.color === chess.turn();
 
         if (canSelectPiece) {
-          console.log("Selecting piece:", piece, "at", square);
           setSelectedSquare(square);
           const moves = chess.moves({
             square: square,
             verbose: true,
           });
           const moveSquares = moves.map((move) => move.to as Square);
-          console.log("Available moves:", moveSquares);
           setAvailableMoves(moveSquares);
         } else {
-          console.log("Cannot select piece - wrong color or not allowed");
           clearSelection();
         }
       }
       // Otherwise, clear selection
       else {
-        console.log("Clicking empty square, clearing selection");
         clearSelection();
       }
     },
@@ -346,47 +326,27 @@ export const useChessBot = (
 
   const handlePieceDrop = useCallback(
     (sourceSquare: Square, targetSquare: Square) => {
-      console.log("Handling piece drop from", sourceSquare, "to", targetSquare);
-      console.log(
-        "Game state - Game over:",
-        chess.isGameOver(),
-        "Analysis mode:",
-        settings.analysisMode,
-        "Player turn:",
-        isPlayerTurn(),
-      );
-
       if (chess.isGameOver() && !settings.analysisMode) {
-        console.log("Game over and not in analysis mode, blocking move");
         return false;
       }
 
       if (!isPlayerTurn() && !settings.analysisMode) {
-        console.log("Not player turn and not in analysis mode, blocking move");
         return false;
       }
 
       // Validate the move is legal
       const piece = chess.get(sourceSquare);
       if (!piece) {
-        console.log("No piece at source square");
         return false;
       }
 
       // In normal mode, check if it's the right player's piece
       if (!settings.analysisMode && piece.color !== chess.turn()) {
-        console.log(
-          "Wrong player piece - piece color:",
-          piece.color,
-          "current turn:",
-          chess.turn(),
-        );
         return false;
       }
 
       // Try to make the move
       const moveSuccessful = makeMove(sourceSquare, targetSquare);
-      console.log("Move result:", moveSuccessful);
 
       // Clear selection after drag and drop
       clearSelection();
@@ -415,7 +375,7 @@ export const useChessBot = (
 
           // Update analysis with bot move
           if (settings.autoAnalysis || settings.analysisMode) {
-            const analysisResult = await stockfishApi.getAnalysis(
+            const analysisResult = await getAnalysisCached(
               chess.fen(),
               settings.aiDepth,
             );
@@ -437,22 +397,21 @@ export const useChessBot = (
     settings.analysisMode,
     updateGameState,
     createAnalysisArrows,
+    getAnalysisCached,
   ]);
 
   const handleGetHint = useCallback(async () => {
     setIsThinking(true);
     try {
-      const analysisResult = await stockfishApi.getAnalysis(
+      const analysisResult = await getAnalysisCached(
         chess.fen(),
         settings.aiDepth,
       );
-      console.log("Hint analysis result:", analysisResult); // Debug log
 
       if (analysisResult?.bestmove) {
         const cleanMove = stockfishApi.extractMoveFromString(
           analysisResult.bestmove,
         );
-        console.log("Extracted hint move:", cleanMove); // Debug log
 
         setHintMove(cleanMove);
         setAnalysis(analysisResult);
@@ -463,7 +422,7 @@ export const useChessBot = (
     } finally {
       setIsThinking(false);
     }
-  }, [chess, settings.aiDepth, createAnalysisArrows]);
+  }, [chess, settings.aiDepth, createAnalysisArrows, getAnalysisCached]);
 
   const handleNewGame = useCallback(() => {
     chess.reset();
@@ -613,11 +572,6 @@ export const useChessBot = (
         // Play a success sound
         soundManager.playMove();
         hapticManager.successPattern();
-
-        console.log(
-          "PGN loaded successfully:",
-          gameInfo.headers.Event || "Unknown Game",
-        );
       } catch (error) {
         console.error("Failed to load PGN game:", error);
         soundManager.playError();

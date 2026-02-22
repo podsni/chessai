@@ -25,29 +25,32 @@
     "clean": "rm -rf dist node_modules/.vite"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.90.21",
     "chess.js": "^1.4.0",
-    "react": "^19.1.0",
+    "react": "^19.2.4",
     "react-chessboard": "^4.7.3",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.2.4",
+    "react-loading-skeleton": "^3.5.0",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
     "@nkzw/oxlint-config": "^1.0.1",
     "@oxlint/migrate": "^1.49.0",
-    "@tailwindcss/forms": "^0.5.10",
-    "@tailwindcss/postcss": "^4.1.10",
-    "@types/react": "^19.1.2",
-    "@types/react-dom": "^19.1.2",
-    "@vitejs/plugin-react": "^4.4.1",
-    "autoprefixer": "^10.4.21",
+    "@tailwindcss/forms": "^0.5.11",
+    "@tailwindcss/postcss": "^4.2.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.4.24",
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
-    "postcss": "^8.5.5",
-    "tailwindcss": "^4.1.10",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.2.0",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.30.1",
-    "vite": "^6.3.5"
+    "vite": "^6.4.1"
   }
 }

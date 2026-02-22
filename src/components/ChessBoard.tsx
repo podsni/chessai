@@ -160,7 +160,6 @@ export function ChessBoard({
         }
       }
 
-      console.log("Square clicked:", square, "Touch device:", isTouchDevice);
       onSquareClick(square);
     },
     [onSquareClick, isTouchDevice, lastTouchTime],
@@ -169,44 +168,25 @@ export function ChessBoard({
   // Enhanced piece drop handler with better mobile support
   const handlePieceDrop = useCallback(
     (sourceSquare: string, targetSquare: string) => {
-      console.log(
-        "Piece dropped from",
-        sourceSquare,
-        "to",
-        targetSquare,
-        "Touch device:",
-        isTouchDevice,
-      );
-
-      // Add small delay for mobile to ensure proper state updates
+      // Mobile haptic feedback without delaying move execution.
       if (isTouchDevice) {
-        // Add haptic feedback for mobile drop
         if (navigator.vibrate) {
-          navigator.vibrate(15); // Medium tap feedback for drop
+          navigator.vibrate(15);
         }
-
-        setTimeout(() => {
-          const moveSuccessful = onPieceDrop(
-            sourceSquare as Square,
-            targetSquare as Square,
-          );
-          console.log("Mobile drop result:", moveSuccessful);
-
-          // Additional feedback for successful/failed moves
-          if (moveSuccessful && navigator.vibrate) {
-            navigator.vibrate([10, 50, 10]); // Success pattern
-          } else if (!moveSuccessful && navigator.vibrate) {
-            navigator.vibrate([100, 50, 100]); // Error pattern
-          }
-        }, 50);
-        return true; // Return true immediately for mobile to prevent snap-back
       }
 
-      // Desktop behavior
       const moveSuccessful = onPieceDrop(
         sourceSquare as Square,
         targetSquare as Square,
       );
+
+      if (isTouchDevice && navigator.vibrate) {
+        if (moveSuccessful) {
+          navigator.vibrate([10, 40, 10]);
+        } else {
+          navigator.vibrate([90, 40, 90]);
+        }
+      }
       return moveSuccessful;
     },
     [onPieceDrop, isTouchDevice],
@@ -233,16 +213,7 @@ export function ChessBoard({
 
   // Handle piece drag begin
   const handlePieceDragBegin = useCallback(
-    (piece: string, sourceSquare: string) => {
-      console.log(
-        "Drag begin:",
-        piece,
-        "from",
-        sourceSquare,
-        "Touch device:",
-        isTouchDevice,
-      );
-
+    (_piece: string, sourceSquare: string) => {
       // For mobile, immediately show available moves
       if (isTouchDevice) {
         onSquareClick(sourceSquare as Square);
@@ -253,9 +224,7 @@ export function ChessBoard({
 
   // Handle piece drag end
   const handlePieceDragEnd = useCallback(
-    (piece: string, sourceSquare: string) => {
-      console.log("Drag end:", piece, "from", sourceSquare);
-    },
+    (_piece: string, _sourceSquare: string) => {},
     [],
   );
 

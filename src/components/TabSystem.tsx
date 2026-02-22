@@ -1,51 +1,63 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Chess } from "chess.js";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChessBot } from "./ChessBot";
-import type { GameSettings, PersistedGameState } from "../types/chess";
-
-interface ChessTab {
-  id: string;
-  name: string;
-  gameState: PersistedGameState;
-  timestamp: number;
-}
+import { useTabsStore } from "../stores/useTabsStore";
 
 export function TabSystem() {
-  const [tabs, setTabs] = useState<ChessTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string>("");
+  const tabs = useTabsStore((state) => state.tabs);
+  const activeTabId = useTabsStore((state) => state.activeTabId);
+  const setActiveTabId = useTabsStore((state) => state.setActiveTabId);
+  const createNewTab = useTabsStore((state) => state.createNewTab);
+  const hydrateTabs = useTabsStore((state) => state.hydrateTabs);
+  const closeTabStore = useTabsStore((state) => state.closeTab);
+  const closeOtherTabs = useTabsStore((state) => state.closeOtherTabs);
+  const closeAllTabsStore = useTabsStore((state) => state.closeAllTabs);
+  const renameTab = useTabsStore((state) => state.renameTab);
+  const updateTabGameState = useTabsStore((state) => state.updateTabGameState);
+  const duplicateTab = useTabsStore((state) => state.duplicateTab);
+
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
     tabId: string;
   } | null>(null);
-  const TABS_STORAGE_KEY = "chessbot-tabs";
+
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hydratedRef = useRef(false);
+  const TABS_STORAGE_KEY = "chessbot-tabs";
 
-  const cloneGameState = useCallback(
-    (gameState: PersistedGameState): PersistedGameState => ({
-      fen: gameState.fen,
-      pgn: gameState.pgn,
-      moveHistory: [...gameState.moveHistory],
-      settings: { ...gameState.settings },
-      lastMove: gameState.lastMove,
-    }),
-    [],
-  );
-
-  // Save tabs to localStorage with a small debounce to reduce UI jank
   useEffect(() => {
-    if (tabs.length > 0) {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
+    if (hydratedRef.current) return;
+    try {
+      const savedTabs = localStorage.getItem(TABS_STORAGE_KEY);
+      if (savedTabs) {
+        hydrateTabs(JSON.parse(savedTabs));
+      } else {
+        createNewTab();
       }
-      saveTimeoutRef.current = setTimeout(() => {
-        try {
-          localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(tabs));
-        } catch (error) {
-          console.error("Error saving tabs:", error);
-        }
-      }, 120);
+    } catch (error) {
+      console.error("Error loading tabs:", error);
+      createNewTab();
+    } finally {
+      hydratedRef.current = true;
     }
+  }, [hydrateTabs, createNewTab]);
+
+  useEffect(() => {
+    if (!hydratedRef.current || tabs.length === 0) {
+      return;
+    }
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(tabs));
+      } catch (error) {
+        console.error("Error saving tabs:", error);
+      }
+    }, 120);
+
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -53,7 +65,6 @@ export function TabSystem() {
     };
   }, [tabs]);
 
-  // Close context menu when clicking outside
   useEffect(() => {
     const handleClickOutside = () => setContextMenu(null);
     const handleEscape = (e: KeyboardEvent) => {
@@ -70,93 +81,20 @@ export function TabSystem() {
     }
   }, [contextMenu]);
 
-  const generateTabId = useCallback(() => {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
-  }, []);
-
-  const createNewTab = useCallback(() => {
-    const newId = generateTabId();
-    const chess = new Chess();
-    const defaultSettings: GameSettings = {
-      mode: "human-vs-ai",
-      boardOrientation: "white",
-      humanColor: "white",
-      aiColor: "black",
-      aiDepth: 10,
-      showAnalysisArrows: true,
-      autoAnalysis: false,
-      analysisMode: false,
-    };
-    const newTab: ChessTab = {
-      id: newId,
-      name: "",
-      gameState: {
-        fen: chess.fen(),
-        pgn: chess.pgn(),
-        moveHistory: [],
-        settings: defaultSettings,
-        lastMove: null,
-      },
-      timestamp: Date.now(),
-    };
-
-    setTabs((prev) => [
-      ...prev,
-      {
-        ...newTab,
-        name: `Game ${prev.length + 1}`,
-      },
-    ]);
-    setActiveTabId(newId);
-  }, [generateTabId]);
-
-  // Load tabs from localStorage on mount
-  useEffect(() => {
-    try {
-      const savedTabs = localStorage.getItem(TABS_STORAGE_KEY);
-      if (savedTabs) {
-        const parsedTabs = JSON.parse(savedTabs) as ChessTab[];
-        setTabs(parsedTabs);
-        if (parsedTabs.length > 0) {
-          setActiveTabId(parsedTabs[0].id);
-        }
-      } else {
-        // Create initial tab
-        createNewTab();
-      }
-    } catch (error) {
-      console.error("Error loading tabs:", error);
-      createNewTab();
-    }
-  }, [createNewTab]);
-
   const closeTab = useCallback(
     (tabId: string, forceClose = false) => {
-      // Show confirmation for unsaved changes (you can implement this logic)
       if (!forceClose && tabs.length > 1) {
         const confirmed = window.confirm(
           "Are you sure you want to close this tab?",
         );
         if (!confirmed) return;
       }
-
-      setTabs((prev) => {
-        const filtered = prev.filter((tab) => tab.id !== tabId);
-
-        // If closing active tab, switch to another tab
-        if (tabId === activeTabId) {
-          if (filtered.length > 0) {
-            setActiveTabId(filtered[0].id);
-          } else {
-            // If no tabs left, create a new one
-            setTimeout(createNewTab, 0);
-          }
-        }
-
-        return filtered;
-      });
+      closeTabStore(tabId);
+      if (tabs.length <= 1) {
+        createNewTab();
+      }
     },
-    [activeTabId, createNewTab, tabs.length],
+    [tabs.length, closeTabStore, createNewTab],
   );
 
   const closeAllTabs = useCallback(() => {
@@ -164,94 +102,29 @@ export function TabSystem() {
       "Are you sure you want to close all tabs? This will create a new game.",
     );
     if (confirmed) {
-      setTabs([]);
-      setTimeout(createNewTab, 0);
+      closeAllTabsStore();
+      createNewTab();
     }
-  }, [createNewTab]);
+  }, [closeAllTabsStore, createNewTab]);
 
-  const closeOtherTabs = useCallback((keepTabId: string) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to close all other tabs?",
-    );
-    if (confirmed) {
-      setTabs((prev) => prev.filter((tab) => tab.id === keepTabId));
-      setActiveTabId(keepTabId);
-    }
-  }, []);
-
-  const duplicateTab = useCallback(
-    (sourceTabId: string) => {
-      setTabs((prev) => {
-        const sourceTab = prev.find((tab) => tab.id === sourceTabId);
-        if (!sourceTab) return prev;
-
-        const newId = generateTabId();
-        const duplicate: ChessTab = {
-          ...sourceTab,
-          id: newId,
-          name: `${sourceTab.name} Copy`,
-          gameState: cloneGameState(sourceTab.gameState),
-          timestamp: Date.now(),
-        };
-
-        setActiveTabId(newId);
-        return [...prev, duplicate];
-      });
-    },
-    [generateTabId, cloneGameState],
-  );
-
-  const renameTab = useCallback((tabId: string, newName: string) => {
-    setTabs((prev) =>
-      prev.map((tab) => (tab.id === tabId ? { ...tab, name: newName } : tab)),
-    );
-  }, []);
-
-  const updateTabGameState = useCallback(
-    (tabId: string, gameState: Partial<ChessTab["gameState"]>) => {
-      setTabs((prev) =>
-        prev.map((tab) =>
-          tab.id === tabId
-            ? {
-                ...tab,
-                gameState: { ...tab.gameState, ...gameState },
-                timestamp: Date.now(),
-              }
-            : tab,
-        ),
-      );
-    },
-    [],
-  );
-
-  // Keyboard shortcuts for tab management
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+W to close current tab
       if (e.ctrlKey && e.key === "w" && tabs.length > 1) {
         e.preventDefault();
         closeTab(activeTabId);
-      }
-      // Ctrl+Shift+W to close all tabs
-      else if (e.ctrlKey && e.shiftKey && e.key === "W" && tabs.length > 1) {
+      } else if (e.ctrlKey && e.shiftKey && e.key === "W" && tabs.length > 1) {
         e.preventDefault();
         closeAllTabs();
-      }
-      // Ctrl+T to create new tab
-      else if (e.ctrlKey && e.key === "t") {
+      } else if (e.ctrlKey && e.key === "t") {
         e.preventDefault();
         createNewTab();
-      }
-      // Ctrl+Tab to switch to next tab
-      else if (e.ctrlKey && e.key === "Tab") {
+      } else if (e.ctrlKey && e.key === "Tab") {
         e.preventDefault();
         if (tabs.length === 0) return;
         const currentIndex = tabs.findIndex((tab) => tab.id === activeTabId);
         const nextIndex = (currentIndex + 1) % tabs.length;
         setActiveTabId(tabs[nextIndex].id);
-      }
-      // Ctrl+Shift+D to duplicate current tab
-      else if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "d") {
+      } else if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "d") {
         e.preventDefault();
         if (activeTabId) {
           duplicateTab(activeTabId);
@@ -261,7 +134,15 @@ export function TabSystem() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [activeTabId, tabs, closeTab, closeAllTabs, createNewTab, duplicateTab]);
+  }, [
+    activeTabId,
+    tabs,
+    createNewTab,
+    setActiveTabId,
+    duplicateTab,
+    closeTab,
+    closeAllTabs,
+  ]);
 
   const activeTab = useMemo(
     () => tabs.find((tab) => tab.id === activeTabId),
@@ -273,7 +154,6 @@ export function TabSystem() {
       className="min-h-screen flex flex-col"
       style={{ background: "var(--bg-primary)" }}
     >
-      {/* Tab Bar */}
       <div className="bg-gray-800 border-b border-gray-700 px-2 md:px-4 py-2 shadow-lg">
         <div className="flex items-center gap-1 md:gap-2 overflow-x-auto tab-container scrollbar-hide">
           {tabs.map((tab) => (
@@ -325,7 +205,6 @@ export function TabSystem() {
                 </button>
               )}
 
-              {/* Always visible close option for active tab on mobile */}
               {tabs.length > 1 && tab.id === activeTabId && (
                 <div className="md:hidden absolute -top-1 -right-1">
                   <button
@@ -343,7 +222,6 @@ export function TabSystem() {
             </div>
           ))}
 
-          {/* New Tab Button */}
           <button
             onClick={createNewTab}
             className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 bg-gray-600 hover:bg-gray-500 text-gray-300 rounded-lg transition-colors ml-1 md:ml-2 touch-manipulation shadow-md hover:shadow-lg"
@@ -362,7 +240,6 @@ export function TabSystem() {
             </svg>
           </button>
 
-          {/* Duplicate Active Tab */}
           {activeTab && (
             <button
               onClick={() => duplicateTab(activeTab.id)}
@@ -380,7 +257,6 @@ export function TabSystem() {
             </button>
           )}
 
-          {/* Close All Tabs Button (only show if more than 1 tab) */}
           {tabs.length > 1 && (
             <button
               onClick={closeAllTabs}
@@ -407,7 +283,6 @@ export function TabSystem() {
           )}
         </div>
 
-        {/* Mobile Tab Indicator */}
         <div className="md:hidden mt-2 flex justify-center">
           <div className="flex gap-1">
             {tabs.map((tab) => (
@@ -422,7 +297,6 @@ export function TabSystem() {
         </div>
       </div>
 
-      {/* Tab Content */}
       <div className="flex-1">
         {activeTab && (
           <ChessBot
@@ -438,13 +312,12 @@ export function TabSystem() {
         )}
       </div>
 
-      {/* Context Menu */}
       {contextMenu && (
         <div
           className="fixed bg-gray-800 border border-gray-600 rounded-lg shadow-xl py-2 z-50 min-w-[180px]"
           style={{
             left: `${Math.min(contextMenu.x, window.innerWidth - 200)}px`,
-            top: `${Math.min(contextMenu.y, window.innerHeight - 150)}px`,
+            top: `${Math.min(contextMenu.y, window.innerHeight - 180)}px`,
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -472,6 +345,17 @@ export function TabSystem() {
             </button>
           )}
 
+          <button
+            onClick={() => {
+              duplicateTab(contextMenu.tabId);
+              setContextMenu(null);
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+          >
+            <span className="text-blue-300">📑</span>
+            Copy Tab
+          </button>
+
           {tabs.length > 1 && (
             <button
               onClick={() => {
@@ -486,17 +370,6 @@ export function TabSystem() {
           )}
 
           <hr className="border-gray-600 my-1" />
-
-          <button
-            onClick={() => {
-              duplicateTab(contextMenu.tabId);
-              setContextMenu(null);
-            }}
-            className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
-          >
-            <span className="text-blue-300">📑</span>
-            Copy Tab
-          </button>
 
           <button
             onClick={() => {
