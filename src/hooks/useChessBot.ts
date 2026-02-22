@@ -342,141 +342,96 @@ export const useChessBot = (
   const handleAnalyzePosition = useCallback(async () => {
     setIsThinking(true);
     try {
-      if (settings.analysisMode) {
-        const engines: AIEngine[] = ["stockfish-online", "chess-api"];
-        const results = await Promise.all(
-          engines.map(async (engine) => {
-            const result = await getSafeAnalysis(
-              chess.fen(),
-              settings.aiDepth,
-              engine,
-            );
-            return {
-              requestedEngine: engine,
-              ...result,
-            };
-          }),
-        );
+      const engines: AIEngine[] =
+        settings.analysisEngineMode === "single"
+          ? [settings.aiEngine]
+          : ["stockfish-online", "chess-api"];
 
+      const results = await Promise.all(
+        engines.map(async (engine) => {
+          const result = await getSafeAnalysis(
+            chess.fen(),
+            settings.aiDepth,
+            engine,
+          );
+          return {
+            requestedEngine: engine,
+            ...result,
+          };
+        }),
+      );
+
+      const preferredResult =
+        results.find((r) => r.requestedEngine === settings.aiEngine) ||
+        results[0];
+      const safeMove = pickSafeMove(results, chess.turn());
+      setAnalysis(preferredResult.analysis);
+
+      if (settings.analysisEngineMode === "single") {
+        setEngineInsights([
+          toEngineInsight(preferredResult.engineUsed, preferredResult.analysis),
+        ]);
+        const singleBest = preferredResult.analysis.bestmove
+          ? engineClients[preferredResult.engineUsed].extractMoveFromString(
+              preferredResult.analysis.bestmove,
+            )
+          : null;
+        setHintMove(singleBest);
+        createAnalysisArrows(singleBest);
+      } else {
         const insights = results.map(({ requestedEngine, analysis }) =>
           toEngineInsight(requestedEngine, analysis),
         );
         setEngineInsights(insights);
+        setHintMove(safeMove);
 
-        const preferredResult =
-          results.find((r) => r.requestedEngine === settings.aiEngine) ||
-          results[0];
-        const safeMove = pickSafeMove(results, chess.turn());
-
-        if (settings.analysisEngineMode === "single") {
-          setAnalysis(preferredResult.analysis);
-          setEngineInsights([
-            toEngineInsight(
-              preferredResult.engineUsed,
-              preferredResult.analysis,
-            ),
-          ]);
-          const singleBest = preferredResult.analysis.bestmove
-            ? engineClients[preferredResult.engineUsed].extractMoveFromString(
-                preferredResult.analysis.bestmove,
-              )
-            : null;
-          setHintMove(singleBest);
-          createAnalysisArrows(singleBest);
+        if (!settings.showAnalysisArrows) {
+          setAnalysisArrows([]);
         } else if (settings.analysisEngineMode === "safe") {
-          setAnalysis(preferredResult.analysis);
-          setEngineInsights(insights);
-          setHintMove(safeMove);
-
-          if (settings.showAnalysisArrows && safeMove) {
-            const parsedSafe = parseMove(safeMove);
-            setAnalysisArrows(
-              parsedSafe
-                ? [
-                    {
-                      from: parsedSafe.from,
-                      to: parsedSafe.to,
-                      color: "#facc15",
-                    },
-                  ]
-                : [],
-            );
-          } else {
-            setAnalysisArrows([]);
-          }
-        } else {
-          // "both" mode
-          setAnalysis(preferredResult.analysis);
-          setEngineInsights(insights);
-          setHintMove(safeMove);
-
-          if (settings.showAnalysisArrows) {
-            const arrowColors: Record<AIEngine, string> = {
-              "stockfish-online": "#7fb069",
-              "chess-api": "#3b82f6",
-            };
-            const parsedArrows = results
-              .map((result) => {
-                const bestMove = engineClients[
-                  result.engineUsed
-                ].extractMoveFromString(result.analysis.bestmove || "");
-                const parsed = bestMove ? parseMove(bestMove) : null;
-                if (!parsed) return null;
-                return {
-                  from: parsed.from,
-                  to: parsed.to,
-                  color: arrowColors[result.requestedEngine],
-                } as AnalysisArrow;
-              })
-              .filter((arrow): arrow is AnalysisArrow => Boolean(arrow));
-
-            const arrows: AnalysisArrow[] =
-              parsedArrows.length >= 2 &&
-              parsedArrows[0].from === parsedArrows[1].from &&
-              parsedArrows[0].to === parsedArrows[1].to
-                ? [
-                    {
-                      ...parsedArrows[0],
-                      color: "#facc15",
-                    },
-                  ]
-                : parsedArrows;
-            setAnalysisArrows(arrows);
-          } else {
-            setAnalysisArrows([]);
-          }
-        }
-
-        const fallbackMessages = results
-          .filter((r) => r.fallbackUsed)
-          .map((r) => `${r.requestedEngine} -> ${r.engineUsed}`);
-        setEngineNotice(
-          fallbackMessages.length > 0
-            ? `Fallback aktif: ${fallbackMessages.join(", ")}`
-            : null,
-        );
-      } else {
-        const preferredEngine = getEngineForCurrentTurn();
-        const { analysis, engineUsed, fallbackUsed } = await getSafeAnalysis(
-          chess.fen(),
-          settings.aiDepth,
-          preferredEngine,
-        );
-        setAnalysis(analysis);
-        setEngineInsights([toEngineInsight(engineUsed, analysis)]);
-        setEngineNotice(
-          fallbackUsed
-            ? `Engine ${preferredEngine} bermasalah, fallback ke ${engineUsed}.`
-            : null,
-        );
-
-        if (analysis?.bestmove) {
-          const cleanMove = engineClients[engineUsed].extractMoveFromString(
-            analysis.bestmove,
+          const parsedSafe = safeMove ? parseMove(safeMove) : null;
+          setAnalysisArrows(
+            parsedSafe
+              ? [{ from: parsedSafe.from, to: parsedSafe.to, color: "#facc15" }]
+              : [],
           );
-          createAnalysisArrows(cleanMove);
+        } else {
+          const arrowColors: Record<AIEngine, string> = {
+            "stockfish-online": "#7fb069",
+            "chess-api": "#3b82f6",
+          };
+          const parsedArrows = results
+            .map((result) => {
+              const bestMove = engineClients[
+                result.engineUsed
+              ].extractMoveFromString(result.analysis.bestmove || "");
+              const parsed = bestMove ? parseMove(bestMove) : null;
+              if (!parsed) return null;
+              return {
+                from: parsed.from,
+                to: parsed.to,
+                color: arrowColors[result.requestedEngine],
+              } as AnalysisArrow;
+            })
+            .filter((arrow): arrow is AnalysisArrow => Boolean(arrow));
+
+          const arrows =
+            parsedArrows.length >= 2 &&
+            parsedArrows[0].from === parsedArrows[1].from &&
+            parsedArrows[0].to === parsedArrows[1].to
+              ? [{ ...parsedArrows[0], color: "#facc15" }]
+              : parsedArrows;
+          setAnalysisArrows(arrows);
         }
       }
+
+      const fallbackMessages = results
+        .filter((r) => r.fallbackUsed)
+        .map((r) => `${r.requestedEngine} -> ${r.engineUsed}`);
+      setEngineNotice(
+        fallbackMessages.length > 0
+          ? `Fallback aktif: ${fallbackMessages.join(", ")}`
+          : null,
+      );
     } catch (error) {
       console.error("Error analyzing position:", error);
       setEngineNotice("Semua engine gagal merespons. Coba lagi sebentar.");
@@ -488,11 +443,9 @@ export const useChessBot = (
     settings.aiDepth,
     settings.aiEngine,
     settings.analysisEngineMode,
-    settings.analysisMode,
     settings.showAnalysisArrows,
     createAnalysisArrows,
     getSafeAnalysis,
-    getEngineForCurrentTurn,
     pickSafeMove,
     parseMove,
     toEngineInsight,
@@ -711,28 +664,92 @@ export const useChessBot = (
   const handleGetHint = useCallback(async () => {
     setIsThinking(true);
     try {
-      const preferredEngine = getEngineForCurrentTurn();
-      const { analysis, engineUsed, fallbackUsed } = await getSafeAnalysis(
-        chess.fen(),
-        settings.aiDepth,
-        preferredEngine,
-      );
-      setEngineNotice(
-        fallbackUsed
-          ? `Engine ${preferredEngine} bermasalah, fallback ke ${engineUsed}.`
-          : null,
+      const engines: AIEngine[] =
+        settings.analysisEngineMode === "single"
+          ? [settings.aiEngine]
+          : ["stockfish-online", "chess-api"];
+      const results = await Promise.all(
+        engines.map(async (engine) => {
+          const result = await getSafeAnalysis(
+            chess.fen(),
+            settings.aiDepth,
+            engine,
+          );
+          return { requestedEngine: engine, ...result };
+        }),
       );
 
-      if (analysis?.bestmove) {
-        const cleanMove = engineClients[engineUsed].extractMoveFromString(
-          analysis.bestmove,
+      const preferredResult =
+        results.find((r) => r.requestedEngine === settings.aiEngine) ||
+        results[0];
+      const safeMove = pickSafeMove(results, chess.turn());
+      setAnalysis(preferredResult.analysis);
+
+      if (settings.analysisEngineMode === "single") {
+        const cleanMove = preferredResult.analysis.bestmove
+          ? engineClients[preferredResult.engineUsed].extractMoveFromString(
+              preferredResult.analysis.bestmove,
+            )
+          : null;
+        setHintMove(cleanMove);
+        createAnalysisArrows(cleanMove);
+        setEngineInsights([
+          toEngineInsight(preferredResult.engineUsed, preferredResult.analysis),
+        ]);
+      } else {
+        setHintMove(safeMove);
+        setEngineInsights(
+          results.map(({ requestedEngine, analysis }) =>
+            toEngineInsight(requestedEngine, analysis),
+          ),
         );
 
-        setHintMove(cleanMove);
-        setAnalysis(analysis);
-        createAnalysisArrows(cleanMove);
-        setEngineInsights([toEngineInsight(engineUsed, analysis)]);
+        if (!settings.showAnalysisArrows) {
+          setAnalysisArrows([]);
+        } else if (settings.analysisEngineMode === "safe") {
+          const parsedSafe = safeMove ? parseMove(safeMove) : null;
+          setAnalysisArrows(
+            parsedSafe
+              ? [{ from: parsedSafe.from, to: parsedSafe.to, color: "#facc15" }]
+              : [],
+          );
+        } else {
+          const arrowColors: Record<AIEngine, string> = {
+            "stockfish-online": "#7fb069",
+            "chess-api": "#3b82f6",
+          };
+          const parsedArrows = results
+            .map((result) => {
+              const bestMove = engineClients[
+                result.engineUsed
+              ].extractMoveFromString(result.analysis.bestmove || "");
+              const parsed = bestMove ? parseMove(bestMove) : null;
+              if (!parsed) return null;
+              return {
+                from: parsed.from,
+                to: parsed.to,
+                color: arrowColors[result.requestedEngine],
+              } as AnalysisArrow;
+            })
+            .filter((arrow): arrow is AnalysisArrow => Boolean(arrow));
+          const arrows =
+            parsedArrows.length >= 2 &&
+            parsedArrows[0].from === parsedArrows[1].from &&
+            parsedArrows[0].to === parsedArrows[1].to
+              ? [{ ...parsedArrows[0], color: "#facc15" }]
+              : parsedArrows;
+          setAnalysisArrows(arrows);
+        }
       }
+
+      const fallbackMessages = results
+        .filter((r) => r.fallbackUsed)
+        .map((r) => `${r.requestedEngine} -> ${r.engineUsed}`);
+      setEngineNotice(
+        fallbackMessages.length > 0
+          ? `Fallback aktif: ${fallbackMessages.join(", ")}`
+          : null,
+      );
     } catch (error) {
       console.error("Error getting hint:", error);
       setEngineNotice("Gagal mendapatkan hint dari engine.");
@@ -742,9 +759,13 @@ export const useChessBot = (
   }, [
     chess,
     settings.aiDepth,
+    settings.aiEngine,
+    settings.analysisEngineMode,
+    settings.showAnalysisArrows,
     createAnalysisArrows,
     getSafeAnalysis,
-    getEngineForCurrentTurn,
+    parseMove,
+    pickSafeMove,
     toEngineInsight,
   ]);
 

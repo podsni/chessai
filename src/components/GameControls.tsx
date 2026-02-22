@@ -159,20 +159,20 @@ export function GameControls({
               </span>
             )}
           </div>
-          {isAnalysisMode && (
+          {
             <div className="mt-1 text-xs text-gray-300">
               Analyze Mode:{" "}
               <span className="text-white font-medium">
                 {analysisModeLabels[settings.analysisEngineMode]}
               </span>
             </div>
-          )}
+          }
           {engineNotice && (
             <div className="mt-2 text-xs text-amber-300 bg-amber-900/20 border border-amber-700/30 rounded px-2 py-1">
               {engineNotice}
             </div>
           )}
-          {isAnalysisMode && (
+          {
             <div className="mt-2 text-[11px] text-gray-300 flex flex-wrap gap-3">
               <span className="inline-flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-[#7fb069]" />
@@ -187,7 +187,7 @@ export function GameControls({
                 Same move (consensus)
               </span>
             </div>
-          )}
+          }
         </div>
 
         {/* AI Prediction Mini Board */}
@@ -514,7 +514,7 @@ export function GameControls({
               </select>
             </div>
 
-            {isAnalysisMode && (
+            {
               <div>
                 <label
                   className="block text-sm font-medium mb-2"
@@ -536,7 +536,7 @@ export function GameControls({
                   <option value="both">Dual Engines + Dual Arrows</option>
                 </select>
               </div>
-            )}
+            }
 
             {settings.mode === "ai-vs-ai" && (
               <>
