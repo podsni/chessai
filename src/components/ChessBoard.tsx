@@ -113,7 +113,7 @@ export function ChessBoard({
       analysisArrows.map((arrow) => ({
         startSquare: arrow.from as Square,
         endSquare: arrow.to as Square,
-        color: "#7fb069",
+        color: arrow.color || "#7fb069",
       })),
     [analysisArrows],
   );

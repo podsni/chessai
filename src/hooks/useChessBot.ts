@@ -9,6 +9,7 @@ import { gameStorage } from "../services/gameStorage";
 import type { PGNGameInfo } from "../services/pgnParser";
 import type {
   AIEngine,
+  EngineInsight,
   GameState,
   StockfishResponse,
   GameSettings,
@@ -82,6 +83,7 @@ export const useChessBot = (
   const [hintMove, setHintMove] = useState<string | null>(null);
   const [isAiVsAiPaused, setIsAiVsAiPaused] = useState(false);
   const [engineNotice, setEngineNotice] = useState<string | null>(null);
+  const [engineInsights, setEngineInsights] = useState<EngineInsight[]>([]);
   const currentFen = chess.fen();
   const currentPgn = chess.pgn();
 
@@ -234,28 +236,129 @@ export const useChessBot = (
     [getAnalysisCached, getFallbackEngine],
   );
 
+  const extractUciMoves = useCallback((text?: string): string[] => {
+    if (!text) return [];
+    const matches = text.match(/[a-h][1-8][a-h][1-8][qrbn]?/g);
+    return matches || [];
+  }, []);
+
+  const buildPredictionLine = useCallback(
+    (engine: AIEngine, analysisData: StockfishResponse): string[] => {
+      const bestMove = analysisData.bestmove
+        ? engineClients[engine].extractMoveFromString(analysisData.bestmove)
+        : null;
+      const continuationMoves = extractUciMoves(analysisData.continuation);
+      const merged = [...(bestMove ? [bestMove] : []), ...continuationMoves];
+      const uniqueOrdered: string[] = [];
+
+      for (const move of merged) {
+        if (!move) continue;
+        if (uniqueOrdered[uniqueOrdered.length - 1] === move) continue;
+        uniqueOrdered.push(move);
+      }
+
+      return uniqueOrdered.slice(0, 6);
+    },
+    [extractUciMoves],
+  );
+
+  const toEngineInsight = useCallback(
+    (engine: AIEngine, analysisData: StockfishResponse): EngineInsight => ({
+      engine,
+      evaluation: analysisData.evaluation,
+      mate: analysisData.mate,
+      bestMove: analysisData.bestmove
+        ? engineClients[engine].extractMoveFromString(analysisData.bestmove) ||
+          undefined
+        : undefined,
+      predictionLine: buildPredictionLine(engine, analysisData),
+    }),
+    [buildPredictionLine],
+  );
+
   const handleAnalyzePosition = useCallback(async () => {
     setIsThinking(true);
     try {
-      const preferredEngine = getEngineForCurrentTurn();
-      const { analysis, engineUsed, fallbackUsed } = await getSafeAnalysis(
-        chess.fen(),
-        settings.aiDepth,
-        preferredEngine,
-      );
-
-      setAnalysis(analysis);
-      setEngineNotice(
-        fallbackUsed
-          ? `Engine ${preferredEngine} bermasalah, fallback ke ${engineUsed}.`
-          : null,
-      );
-
-      if (analysis?.bestmove) {
-        const cleanMove = engineClients[engineUsed].extractMoveFromString(
-          analysis.bestmove,
+      if (settings.analysisMode) {
+        const engines: AIEngine[] = ["stockfish-online", "chess-api"];
+        const results = await Promise.all(
+          engines.map(async (engine) => {
+            const result = await getSafeAnalysis(
+              chess.fen(),
+              settings.aiDepth,
+              engine,
+            );
+            return {
+              requestedEngine: engine,
+              ...result,
+            };
+          }),
         );
-        createAnalysisArrows(cleanMove);
+
+        const insights = results.map(({ requestedEngine, analysis }) =>
+          toEngineInsight(requestedEngine, analysis),
+        );
+        setEngineInsights(insights);
+
+        const preferredResult =
+          results.find((r) => r.requestedEngine === settings.aiEngine) ||
+          results[0];
+        setAnalysis(preferredResult.analysis);
+
+        if (settings.showAnalysisArrows) {
+          const arrowColors: Record<AIEngine, string> = {
+            "stockfish-online": "#7fb069",
+            "chess-api": "#3b82f6",
+          };
+          const arrows: AnalysisArrow[] = [];
+
+          for (const result of results) {
+            const bestMove = engineClients[
+              result.requestedEngine
+            ].extractMoveFromString(result.analysis.bestmove || "");
+            const parsed = bestMove ? parseMove(bestMove) : null;
+            if (parsed) {
+              arrows.push({
+                from: parsed.from,
+                to: parsed.to,
+                color: arrowColors[result.requestedEngine],
+              });
+            }
+          }
+          setAnalysisArrows(arrows);
+        } else {
+          setAnalysisArrows([]);
+        }
+
+        const fallbackMessages = results
+          .filter((r) => r.fallbackUsed)
+          .map((r) => `${r.requestedEngine} -> ${r.engineUsed}`);
+        setEngineNotice(
+          fallbackMessages.length > 0
+            ? `Fallback aktif: ${fallbackMessages.join(", ")}`
+            : null,
+        );
+      } else {
+        const preferredEngine = getEngineForCurrentTurn();
+        const { analysis, engineUsed, fallbackUsed } = await getSafeAnalysis(
+          chess.fen(),
+          settings.aiDepth,
+          preferredEngine,
+        );
+        setAnalysis(analysis);
+        setEngineInsights([toEngineInsight(engineUsed, analysis)]);
+        setEngineNotice(
+          fallbackUsed
+            ? `Engine ${preferredEngine} bermasalah, fallback ke ${engineUsed}.`
+            : null,
+        );
+
+        if (analysis?.bestmove) {
+          const cleanMove = engineClients[engineUsed].extractMoveFromString(
+            analysis.bestmove,
+          );
+          createAnalysisArrows(cleanMove);
+        }
       }
     } catch (error) {
       console.error("Error analyzing position:", error);
@@ -266,9 +369,14 @@ export const useChessBot = (
   }, [
     chess,
     settings.aiDepth,
+    settings.aiEngine,
+    settings.analysisMode,
+    settings.showAnalysisArrows,
     createAnalysisArrows,
     getSafeAnalysis,
     getEngineForCurrentTurn,
+    parseMove,
+    toEngineInsight,
   ]);
 
   const makeMove = useCallback(
@@ -437,6 +545,7 @@ export const useChessBot = (
       const bestMove = analysis.bestmove
         ? engineClients[engineUsed].extractMoveFromString(analysis.bestmove)
         : null;
+      setEngineInsights([toEngineInsight(engineUsed, analysis)]);
 
       if (bestMove) {
         const move = chess.move(bestMove);
@@ -455,6 +564,9 @@ export const useChessBot = (
             );
             setAnalysis(nextAnalysis.analysis);
             createAnalysisArrows(nextAnalysis.analysis?.bestmove || null);
+            setEngineInsights([
+              toEngineInsight(nextAnalysis.engineUsed, nextAnalysis.analysis),
+            ]);
           }
         }
       }
@@ -474,6 +586,7 @@ export const useChessBot = (
     createAnalysisArrows,
     getSafeAnalysis,
     getEngineForCurrentTurn,
+    toEngineInsight,
   ]);
 
   const handleGetHint = useCallback(async () => {
@@ -499,6 +612,7 @@ export const useChessBot = (
         setHintMove(cleanMove);
         setAnalysis(analysis);
         createAnalysisArrows(cleanMove);
+        setEngineInsights([toEngineInsight(engineUsed, analysis)]);
       }
     } catch (error) {
       console.error("Error getting hint:", error);
@@ -512,12 +626,14 @@ export const useChessBot = (
     createAnalysisArrows,
     getSafeAnalysis,
     getEngineForCurrentTurn,
+    toEngineInsight,
   ]);
 
   const handleNewGame = useCallback(() => {
     chess.reset();
     setMoveHistory([]);
     setAnalysis(null);
+    setEngineInsights([]);
     setAnalysisArrows([]);
     setHintMove(null);
     clearSelection();
@@ -528,6 +644,7 @@ export const useChessBot = (
     chess.reset();
     setMoveHistory([]);
     setAnalysis(null);
+    setEngineInsights([]);
     setAnalysisArrows([]);
     setHintMove(null);
     clearSelection();
@@ -544,6 +661,7 @@ export const useChessBot = (
     chess.reset();
     setMoveHistory([]);
     setAnalysis(null);
+    setEngineInsights([]);
     setAnalysisArrows([]);
     setHintMove(null);
     clearSelection();
@@ -566,6 +684,7 @@ export const useChessBot = (
     if (move) {
       setMoveHistory((prev) => prev.slice(0, -1));
       setAnalysis(null);
+      setEngineInsights([]);
       setAnalysisArrows([]);
       setHintMove(null);
       clearSelection();
@@ -579,6 +698,7 @@ export const useChessBot = (
         chess.load(fen);
         setMoveHistory([]);
         setAnalysis(null);
+        setEngineInsights([]);
         setAnalysisArrows([]);
         setHintMove(null);
         clearSelection();
@@ -658,6 +778,7 @@ export const useChessBot = (
 
         setMoveHistory(moveHistory);
         setAnalysis(null);
+        setEngineInsights([]);
         setAnalysisArrows([]);
         setHintMove(null);
         clearSelection();
@@ -775,6 +896,7 @@ export const useChessBot = (
     gameStatus: getGameStatus(),
     isThinking,
     analysis,
+    engineInsights,
     moveHistory,
     analysisArrows,
     hintMove,

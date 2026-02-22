@@ -4,6 +4,7 @@ interface ChessApiResponse {
   move?: string;
   lan?: string;
   mate?: number | null;
+  continuationArr?: string[];
 }
 
 interface EngineAnalysisResponse {
@@ -50,6 +51,9 @@ export class ChessApiEngine {
         evaluation: centipawns,
         mate: data.mate ?? undefined,
         bestmove: bestMove,
+        continuation: Array.isArray(data.continuationArr)
+          ? data.continuationArr.join(" ")
+          : undefined,
       };
     } catch (error) {
       console.error("Error fetching chess-api analysis:", error);

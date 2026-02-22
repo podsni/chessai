@@ -49,6 +49,14 @@ export interface AnalysisData {
   pv: string[];
 }
 
+export interface EngineInsight {
+  engine: AIEngine;
+  evaluation?: number;
+  mate?: number;
+  bestMove?: string;
+  predictionLine: string[];
+}
+
 export interface PersistedGameState {
   fen: string;
   pgn: string;

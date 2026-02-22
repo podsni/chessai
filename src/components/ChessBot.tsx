@@ -64,6 +64,7 @@ export function ChessBot({
     gameStatus,
     isThinking,
     analysis,
+    engineInsights,
     moveHistory,
     analysisArrows,
     hintMove,
@@ -442,6 +443,7 @@ export function ChessBot({
               boardOrientation={settings.boardOrientation}
               isAiVsAiPaused={isAiVsAiPaused}
               engineNotice={engineNotice}
+              engineInsights={engineInsights}
               onPauseAiVsAi={handlePauseAiVsAi}
               onResumeAiVsAi={handleResumeAiVsAi}
             />

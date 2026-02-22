@@ -1,7 +1,13 @@
 import { useState } from "react";
+import { Chess } from "chess.js";
 import { MiniBoard } from "./MiniBoard";
 import Skeleton, { SkeletonTheme } from "react-loading-skeleton";
-import type { AIEngine, GameSettings, GameMode } from "../types/chess";
+import type {
+  AIEngine,
+  EngineInsight,
+  GameSettings,
+  GameMode,
+} from "../types/chess";
 
 interface GameControlsProps {
   settings: GameSettings;
@@ -28,6 +34,7 @@ interface GameControlsProps {
   boardOrientation: "white" | "black";
   isAiVsAiPaused: boolean;
   engineNotice: string | null;
+  engineInsights: EngineInsight[];
   onPauseAiVsAi: () => void;
   onResumeAiVsAi: () => void;
 }
@@ -57,6 +64,7 @@ export function GameControls({
   boardOrientation,
   isAiVsAiPaused,
   engineNotice,
+  engineInsights,
   onPauseAiVsAi,
   onResumeAiVsAi,
 }: GameControlsProps) {
@@ -84,6 +92,20 @@ export function GameControls({
   const engineLabels: Record<AIEngine, string> = {
     "stockfish-online": "Stockfish Online",
     "chess-api": "Chess API",
+  };
+
+  const buildPredictionSteps = (fen: string, moves: string[], maxSteps = 4) => {
+    const board = new Chess(fen);
+    const steps: Array<{ fen: string; move: string; step: number }> = [];
+    for (const move of moves.slice(0, maxSteps)) {
+      steps.push({ fen: board.fen(), move, step: steps.length + 1 });
+      try {
+        board.move(move);
+      } catch {
+        break;
+      }
+    }
+    return steps;
   };
 
   return (
@@ -139,7 +161,7 @@ export function GameControls({
         </div>
 
         {/* AI Prediction Mini Board */}
-        {(bestMove || hintMove) && (
+        {(bestMove || hintMove || engineInsights.length > 0) && (
           <div className="game-card control-section p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -158,26 +180,82 @@ export function GameControls({
 
             {showPrediction && (
               <div className="space-y-3">
-                {bestMove && (
-                  <MiniBoard
-                    fen={currentFen}
-                    bestMove={bestMove}
-                    evaluation={evaluation}
-                    mate={mate}
-                    title="Best Move"
-                    boardOrientation={boardOrientation}
-                  />
-                )}
+                {engineInsights.length > 0 ? (
+                  engineInsights.map((insight) => {
+                    const steps = buildPredictionSteps(
+                      currentFen,
+                      insight.predictionLine,
+                      3,
+                    );
+                    return (
+                      <div
+                        key={insight.engine}
+                        className="rounded-lg border border-gray-700 bg-gray-900/50 p-3 space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-semibold text-white">
+                            {engineLabels[insight.engine]}
+                          </h4>
+                          <span className="text-xs text-gray-300">
+                            {insight.mate !== null && insight.mate !== undefined
+                              ? `M${Math.abs(insight.mate)}`
+                              : insight.evaluation !== null &&
+                                  insight.evaluation !== undefined
+                                ? `${insight.evaluation > 0 ? "+" : ""}${(insight.evaluation / 100).toFixed(2)}`
+                                : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {insight.predictionLine.slice(0, 6).map((move, i) => (
+                            <span
+                              key={`${insight.engine}-${move}-${i}`}
+                              className="text-[11px] font-mono bg-gray-800 text-gray-200 px-2 py-1 rounded"
+                            >
+                              {i + 1}. {move}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                          {steps.map((step) => (
+                            <MiniBoard
+                              key={`${insight.engine}-step-${step.step}`}
+                              fen={step.fen}
+                              bestMove={step.move}
+                              evaluation={insight.evaluation}
+                              mate={insight.mate}
+                              title={`Step ${step.step}`}
+                              boardOrientation={boardOrientation}
+                              size={150}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <>
+                    {bestMove && (
+                      <MiniBoard
+                        fen={currentFen}
+                        bestMove={bestMove}
+                        evaluation={evaluation}
+                        mate={mate}
+                        title="Best Move"
+                        boardOrientation={boardOrientation}
+                      />
+                    )}
 
-                {hintMove && hintMove !== bestMove && (
-                  <MiniBoard
-                    fen={currentFen}
-                    bestMove={hintMove}
-                    evaluation={evaluation}
-                    mate={mate}
-                    title="Hint Move"
-                    boardOrientation={boardOrientation}
-                  />
+                    {hintMove && hintMove !== bestMove && (
+                      <MiniBoard
+                        fen={currentFen}
+                        bestMove={hintMove}
+                        evaluation={evaluation}
+                        mate={mate}
+                        title="Hint Move"
+                        boardOrientation={boardOrientation}
+                      />
+                    )}
+                  </>
                 )}
               </div>
             )}
