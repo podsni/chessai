@@ -831,6 +831,28 @@ body {
   max-width: 1320px;
 }
 
+.hero-strip {
+  position: relative;
+}
+
+.hero-card {
+  box-shadow:
+    0 8px 26px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.hero-image {
+  filter: saturate(1.05) contrast(1.02);
+}
+
+.hero-overlay {
+  background: linear-gradient(
+    180deg,
+    rgba(11, 10, 8, 0.2) 0%,
+    rgba(11, 10, 8, 0.72) 70%
+  );
+}
+
 .page-footer {
   background: linear-gradient(
     180deg,
@@ -871,6 +893,10 @@ body {
 
 .controls-stack {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+.control-hero {
+  border-color: rgba(170, 145, 97, 0.3);
 }
 
 .control-section {
@@ -929,6 +955,10 @@ body {
 @media (max-width: 768px) {
   .page-main {
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  .hero-card {
+    border-radius: 12px;
   }
 
   .game-card {

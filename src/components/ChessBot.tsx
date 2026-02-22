@@ -180,6 +180,35 @@ export function ChessBot({
         </div>
       )}
 
+      <section className="hero-strip container mx-auto px-2 pt-2 md:px-4 md:pt-4">
+        <div className="hero-card relative overflow-hidden rounded-xl border border-amber-900/30">
+          <img
+            src="/chess-hero.svg"
+            alt="Chess hero illustration"
+            className="hero-image h-24 w-full object-cover md:h-32"
+            loading="lazy"
+          />
+          <div className="hero-overlay absolute inset-0 flex items-end justify-between p-3 md:p-4">
+            <div className="text-white">
+              <p className="text-xs uppercase tracking-[0.2em] text-amber-300/90">
+                Analysis Studio
+              </p>
+              <p className="text-sm font-semibold md:text-base">
+                Semua mode main tetap aktif dan responsif di mobile.
+              </p>
+            </div>
+            <div className="hidden gap-2 sm:flex">
+              <span className="rounded-full bg-black/35 px-3 py-1 text-xs text-gray-100">
+                AI Ready
+              </span>
+              <span className="rounded-full bg-black/35 px-3 py-1 text-xs text-gray-100">
+                Touch First
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Main Content */}
       <main className="page-main container mx-auto px-2 py-4 md:px-4 md:py-6">
         <div className="dashboard-layout grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">

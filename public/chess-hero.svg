@@ -1,0 +1,36 @@
+<svg width="640" height="320" viewBox="0 0 640 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#11100E"/>
+      <stop offset="1" stop-color="#2A251F"/>
+    </linearGradient>
+    <linearGradient id="knight" x1="175" y1="58" x2="365" y2="290" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5E3B2"/>
+      <stop offset="1" stop-color="#B8904B"/>
+    </linearGradient>
+    <filter id="shadow" x="115" y="24" width="300" height="300" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <rect width="640" height="320" rx="24" fill="url(#bg)"/>
+  <g opacity="0.35">
+    <rect x="398" y="34" width="208" height="252" rx="18" fill="#3A3228"/>
+    <path d="M398 76H606" stroke="#4A4135" stroke-width="2"/>
+    <path d="M398 118H606" stroke="#4A4135" stroke-width="2"/>
+    <path d="M398 160H606" stroke="#4A4135" stroke-width="2"/>
+    <path d="M398 202H606" stroke="#4A4135" stroke-width="2"/>
+    <path d="M398 244H606" stroke="#4A4135" stroke-width="2"/>
+    <path d="M440 34V286" stroke="#4A4135" stroke-width="2"/>
+    <path d="M482 34V286" stroke="#4A4135" stroke-width="2"/>
+    <path d="M524 34V286" stroke="#4A4135" stroke-width="2"/>
+    <path d="M566 34V286" stroke="#4A4135" stroke-width="2"/>
+  </g>
+  <g filter="url(#shadow)">
+    <path d="M274 72C274 72 256 58 234 58C197 58 181 92 181 92L220 105C223 96 234 88 247 88C260 88 274 96 279 111L263 117L287 153L340 121L316 86L301 93C294 82 285 75 274 72Z" fill="url(#knight)"/>
+    <path d="M174 247H362V266H174V247Z" fill="#A1793E"/>
+    <path d="M198 160C198 149 207 140 218 140H298C318 140 334 156 334 176V247H198V160Z" fill="url(#knight)"/>
+    <circle cx="232" cy="104" r="8" fill="#3B2A15"/>
+  </g>
+  <text x="40" y="68" fill="#F7EFD9" font-size="22" font-family="Poppins, Arial, sans-serif" font-weight="700">Chess Bot Analysis</text>
+  <text x="40" y="98" fill="#CFC4AA" font-size="14" font-family="Poppins, Arial, sans-serif">Fast analysis. Better decisions. Mobile ready.</text>
+</svg>
