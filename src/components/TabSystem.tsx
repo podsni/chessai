@@ -149,6 +149,24 @@ export function TabSystem() {
     [tabs, activeTabId],
   );
 
+  const handleActiveGameStateChange = useCallback(
+    (gameState: Parameters<typeof updateTabGameState>[1]) => {
+      if (activeTabId) {
+        updateTabGameState(activeTabId, gameState);
+      }
+    },
+    [activeTabId, updateTabGameState],
+  );
+
+  const handleActiveTabRename = useCallback(
+    (newName: string) => {
+      if (activeTabId) {
+        renameTab(activeTabId, newName);
+      }
+    },
+    [activeTabId, renameTab],
+  );
+
   return (
     <div
       className="min-h-screen flex flex-col"
@@ -304,10 +322,8 @@ export function TabSystem() {
             tabId={activeTab.id}
             tabName={activeTab.name}
             initialGameState={activeTab.gameState}
-            onGameStateChange={(gameState) =>
-              updateTabGameState(activeTab.id, gameState)
-            }
-            onRename={(newName) => renameTab(activeTab.id, newName)}
+            onGameStateChange={handleActiveGameStateChange}
+            onRename={handleActiveTabRename}
           />
         )}
       </div>

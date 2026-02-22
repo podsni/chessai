@@ -59,6 +59,31 @@ const cloneGameState = (gameState: PersistedGameState): PersistedGameState => ({
   lastMove: gameState.lastMove,
 });
 
+const isSameGameState = (
+  prev: PersistedGameState,
+  next: PersistedGameState,
+): boolean => {
+  if (
+    prev.fen !== next.fen ||
+    prev.pgn !== next.pgn ||
+    prev.lastMove !== next.lastMove
+  ) {
+    return false;
+  }
+
+  if (prev.moveHistory.length !== next.moveHistory.length) {
+    return false;
+  }
+
+  for (let i = 0; i < prev.moveHistory.length; i += 1) {
+    if (prev.moveHistory[i] !== next.moveHistory[i]) {
+      return false;
+    }
+  }
+
+  return JSON.stringify(prev.settings) === JSON.stringify(next.settings);
+};
+
 export const useTabsStore = create<TabsStore>((set, get) => ({
   tabs: [],
   activeTabId: "",
@@ -124,11 +149,17 @@ export const useTabsStore = create<TabsStore>((set, get) => ({
     set((state) => ({
       tabs: state.tabs.map((tab) =>
         tab.id === tabId
-          ? {
-              ...tab,
-              gameState: { ...tab.gameState, ...gameState },
-              timestamp: Date.now(),
-            }
+          ? (() => {
+              const merged = { ...tab.gameState, ...gameState };
+              if (isSameGameState(tab.gameState, merged)) {
+                return tab;
+              }
+              return {
+                ...tab,
+                gameState: merged,
+                timestamp: Date.now(),
+              };
+            })()
           : tab,
       ),
     }));
