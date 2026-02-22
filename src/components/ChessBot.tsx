@@ -6,6 +6,19 @@ import { MoveNotation } from "./MoveNotation";
 import { PgnLoadModal } from "./PgnLoadModal";
 import { useChessBot } from "../hooks/useChessBot";
 import { useState, useEffect } from "react";
+import {
+  BarChart3,
+  Bot,
+  Crown,
+  FileText,
+  Lightbulb,
+  LocateFixed,
+  RotateCcw,
+  ScanSearch,
+  Settings,
+  Smartphone,
+  Target,
+} from "lucide-react";
 import type { PersistedGameState } from "../types/chess";
 
 interface ChessBotProps {
@@ -80,13 +93,11 @@ export function ChessBot({
   return (
     <div className="page-shell min-h-screen">
       {/* Header */}
-      <header className="page-header border-b border-gray-700 shadow-lg">
+      <header className="page-header border-b border-slate-700/80 shadow-lg bg-slate-900/80 backdrop-blur">
         <div className="container mx-auto px-2 py-3 md:px-4 md:py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1 md:gap-3 flex-1 min-w-0">
-              <span className="text-xl md:text-4xl flex-shrink-0 hidden sm:inline">
-                ♔
-              </span>
+              <Crown className="h-5 w-5 md:h-8 md:w-8 flex-shrink-0 text-amber-300 hidden sm:inline" />
               <div className="text-center md:text-left flex-1 min-w-0">
                 {tabId && onRename ? (
                   isRenaming ? (
@@ -133,30 +144,28 @@ export function ChessBot({
                 <p className="text-gray-300 text-xs md:text-sm hidden sm:block">
                   Advanced Chess Analysis with AI • Drag & Drop Enabled
                 </p>
-                <p className="text-gray-300 text-xs sm:hidden">
+                <p className="text-slate-300 text-xs sm:hidden">
                   Chess AI • Touch Enabled
                 </p>
               </div>
-              <span className="text-xl md:text-4xl flex-shrink-0 hidden sm:inline">
-                ♚
-              </span>
+              <Crown className="h-5 w-5 md:h-8 md:w-8 flex-shrink-0 text-slate-200 hidden sm:inline" />
             </div>
             <div className="flex gap-1 md:gap-2 ml-2 md:ml-4 flex-shrink-0">
               <button
                 onClick={() => setShowPgnModal(true)}
-                className="chess-button secondary header-action-btn p-2 md:p-2 text-xs md:text-sm touch-manipulation"
+                className="chess-button secondary header-action-btn h-10 px-3 text-xs md:text-sm touch-manipulation inline-flex items-center gap-1.5"
                 title="Load PGN Game"
               >
-                <span className="hidden md:inline">📝</span>
-                <span className="md:hidden">PGN</span>
+                <FileText className="w-4 h-4" />
+                <span>PGN</span>
               </button>
               <button
                 onClick={() => setShowSettings(true)}
-                className="chess-button secondary header-action-btn p-2 md:p-2 text-xs md:text-sm touch-manipulation"
+                className="chess-button secondary header-action-btn h-10 px-3 text-xs md:text-sm touch-manipulation inline-flex items-center gap-1.5"
                 title="Settings"
               >
-                <span className="hidden md:inline">⚙️</span>
-                <span className="md:hidden">⚙️</span>
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Settings</span>
               </button>
             </div>
           </div>
@@ -165,17 +174,21 @@ export function ChessBot({
 
       {/* Mobile Quick Tips */}
       {isMobile && (
-        <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border-b border-blue-500/30 px-2 py-2 md:px-3 md:py-2">
+        <div className="bg-gradient-to-r from-blue-950/35 to-indigo-950/35 border-b border-blue-500/30 px-2 py-2 md:px-3 md:py-2">
           <div className="text-center">
-            <p className="text-blue-300 text-xs leading-relaxed">
-              💡 <strong>Touch Tips:</strong> Tap piece → Tap destination or
-              drag pieces to move
+            <p className="text-blue-300 text-xs leading-relaxed inline-flex items-center gap-1.5">
+              <Lightbulb className="w-3.5 h-3.5" />
+              <strong>Touch Tips:</strong> Tap piece → Tap destination or drag
+              pieces to move
             </p>
             {selectedSquare && (
               <div className="mt-2 bg-yellow-500/20 rounded-lg px-3 py-1 inline-block">
-                <p className="text-yellow-300 text-xs font-medium">
-                  ✨ Selected:{" "}
-                  <strong className="text-yellow-100">{selectedSquare}</strong>{" "}
+                <p className="text-yellow-300 text-xs font-medium inline-flex items-center gap-1">
+                  <ScanSearch className="w-3.5 h-3.5" />
+                  Selected:{" "}
+                  <strong className="text-yellow-100">
+                    {selectedSquare}
+                  </strong>{" "}
                   → Tap green square to move
                 </p>
               </div>
@@ -191,7 +204,7 @@ export function ChessBot({
             <div className="game-card board-panel p-4 md:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
                 <h2 className="text-lg md:text-xl font-semibold text-white flex items-center gap-2 flex-wrap">
-                  <span>🏁</span>
+                  <Target className="w-5 h-5 text-emerald-400" />
                   <span className="hidden sm:inline">Chess Board</span>
                   <span className="sm:hidden">Board</span>
                   {settings.analysisMode && (
@@ -219,7 +232,7 @@ export function ChessBot({
                     <span
                       className={`font-medium px-2 py-1 rounded text-xs ${settings.humanColor === "white" ? "bg-gray-100 text-black" : "bg-gray-800 text-white"}`}
                     >
-                      {settings.humanColor === "white" ? "♔" : "♚"}{" "}
+                      <Crown className="w-3 h-3 inline-block mr-1" />
                       {settings.humanColor}
                     </span>
                   </div>
@@ -229,7 +242,7 @@ export function ChessBot({
                       <span
                         className={`font-medium px-2 py-1 rounded text-xs ${settings.aiColor === "white" ? "bg-gray-100 text-black" : "bg-gray-800 text-white"}`}
                       >
-                        {settings.aiColor === "white" ? "♔" : "♚"}{" "}
+                        <Crown className="w-3 h-3 inline-block mr-1" />
                         {settings.aiColor}
                       </span>
                     </div>
@@ -264,7 +277,7 @@ export function ChessBot({
                     {isThinking ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     ) : (
-                      <span>💡</span>
+                      <Lightbulb className="w-4 h-4" />
                     )}
                     <span className="hidden sm:inline">
                       {isThinking ? "Thinking..." : "Get Hint"}
@@ -283,7 +296,7 @@ export function ChessBot({
                     {isThinking ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     ) : (
-                      <span>📊</span>
+                      <BarChart3 className="w-4 h-4" />
                     )}
                     <span className="hidden sm:inline">
                       {isThinking ? "Analyzing..." : "Analyze"}
@@ -298,7 +311,7 @@ export function ChessBot({
                   className="chess-button secondary flex-1 sm:flex-none min-h-[44px] touch-manipulation"
                 >
                   <div className="flex items-center justify-center gap-1">
-                    <span>🔄</span>
+                    <RotateCcw className="w-4 h-4" />
                     <span className="hidden sm:inline">Flip</span>
                     <span className="sm:hidden text-xs">Flip</span>
                   </div>
@@ -308,7 +321,7 @@ export function ChessBot({
                   className="chess-button secondary flex-1 sm:flex-none min-h-[44px] touch-manipulation"
                 >
                   <div className="flex items-center justify-center gap-1">
-                    <span>↩️</span>
+                    <RotateCcw className="w-4 h-4" />
                     <span className="hidden sm:inline">Undo</span>
                     <span className="sm:hidden text-xs">Undo</span>
                   </div>
@@ -322,7 +335,7 @@ export function ChessBot({
                     {selectedSquare ? (
                       <div className="text-yellow-300 font-medium">
                         <div className="flex items-center justify-center gap-1">
-                          <span>📍</span>
+                          <LocateFixed className="w-3.5 h-3.5" />
                           <span>
                             Selected: <strong>{selectedSquare}</strong>
                           </span>
@@ -333,7 +346,7 @@ export function ChessBot({
                       </div>
                     ) : (
                       <div className="text-gray-400 flex items-center justify-center gap-1">
-                        <span>🎯</span>
+                        <Target className="w-3.5 h-3.5" />
                         <span>Tap any piece to see moves</span>
                       </div>
                     )}
@@ -442,15 +455,15 @@ export function ChessBot({
             <div className="flex justify-center items-center gap-1 md:gap-4 mt-2 flex-wrap text-xs">
               <span className="text-gray-500 hidden md:inline">Features:</span>
               <div className="flex items-center gap-1 bg-gray-800 rounded-full px-2 py-1">
-                <span className="text-green-400">🤖</span>
+                <Bot className="w-3.5 h-3.5 text-green-400" />
                 <span className="text-gray-400">AI Analysis</span>
               </div>
               <div className="flex items-center gap-1 bg-gray-800 rounded-full px-2 py-1">
-                <span className="text-blue-400">👆</span>
+                <Target className="w-3.5 h-3.5 text-blue-400" />
                 <span className="text-gray-400">Touch Enabled</span>
               </div>
               <div className="flex items-center gap-1 bg-gray-800 rounded-full px-2 py-1">
-                <span className="text-purple-400">📱</span>
+                <Smartphone className="w-3.5 h-3.5 text-purple-400" />
                 <span className="text-gray-400">Mobile Ready</span>
               </div>
             </div>
