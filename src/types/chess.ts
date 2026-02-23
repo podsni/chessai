@@ -17,6 +17,8 @@ export interface GameSettings {
   battleEnabled: boolean;
   battleOpponentEngine: AIEngine;
   showAnalysisArrows: boolean;
+  wdlPolicyArrows: boolean;
+  wdlShowAllArrowsDefault: boolean;
   autoAnalysis: boolean;
   analysisMode: boolean;
 }
@@ -32,6 +34,17 @@ export interface GameState {
 export interface AnalysisArrow {
   from: Square;
   to: Square;
+  color: string;
+}
+
+export interface WdlArrowScore {
+  move: string;
+  win: number;
+  draw: number;
+  loss: number;
+  deltaLoss: number;
+  quality: number;
+  verdict: "best" | "safe" | "risky" | "blunder";
   color: string;
 }
 

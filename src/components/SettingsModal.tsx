@@ -73,6 +73,8 @@ export function SettingsModal({
       battleEnabled: localSettings.battleEnabled,
       battleOpponentEngine: localSettings.battleOpponentEngine,
       showAnalysisArrows: localSettings.showAnalysisArrows,
+      wdlPolicyArrows: localSettings.wdlPolicyArrows,
+      wdlShowAllArrowsDefault: localSettings.wdlShowAllArrowsDefault,
       autoAnalysis: localSettings.autoAnalysis,
       aiDepth: localSettings.aiDepth,
     });
@@ -89,6 +91,8 @@ export function SettingsModal({
       battleEnabled: localSettings.battleEnabled,
       battleOpponentEngine: localSettings.battleOpponentEngine,
       showAnalysisArrows: localSettings.showAnalysisArrows,
+      wdlPolicyArrows: localSettings.wdlPolicyArrows,
+      wdlShowAllArrowsDefault: localSettings.wdlShowAllArrowsDefault,
       autoAnalysis: localSettings.autoAnalysis,
       analysisMode: localSettings.analysisMode,
     });
@@ -210,6 +214,34 @@ export function SettingsModal({
                   checked={localSettings.autoAnalysis}
                   onChange={(e) =>
                     handleSettingChange("autoAnalysis", e.target.checked)
+                  }
+                  className="w-4 h-4 text-blue-600 rounded"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <label className="text-gray-300">WDL Policy Arrows</label>
+                <input
+                  type="checkbox"
+                  checked={localSettings.wdlPolicyArrows}
+                  onChange={(e) =>
+                    handleSettingChange("wdlPolicyArrows", e.target.checked)
+                  }
+                  className="w-4 h-4 text-blue-600 rounded"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-gray-300">
+                  Default Show All WDL Arrows
+                </label>
+                <input
+                  type="checkbox"
+                  checked={localSettings.wdlShowAllArrowsDefault}
+                  onChange={(e) =>
+                    handleSettingChange(
+                      "wdlShowAllArrowsDefault",
+                      e.target.checked,
+                    )
                   }
                   className="w-4 h-4 text-blue-600 rounded"
                 />

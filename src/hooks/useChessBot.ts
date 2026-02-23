@@ -10,6 +10,7 @@ import {
   getAiMoveDepthLimit,
   getAnalysisDepthLimit,
 } from "../utils/engineConstraints";
+import { estimateWdl } from "../utils/evaluation";
 import type { PGNGameInfo } from "../services/pgnParser";
 import type {
   AIEngine,
@@ -19,6 +20,7 @@ import type {
   GameSettings,
   AnalysisArrow,
   PersistedGameState,
+  WdlArrowScore,
 } from "../types/chess";
 
 const stockfishApi = new StockfishAPI();
@@ -67,6 +69,8 @@ export const useChessBot = (
       battleEnabled: savedSettings.battleEnabled || false,
       battleOpponentEngine: savedSettings.battleOpponentEngine || "chess-api",
       showAnalysisArrows: savedSettings.showAnalysisArrows,
+      wdlPolicyArrows: savedSettings.wdlPolicyArrows ?? true,
+      wdlShowAllArrowsDefault: savedSettings.wdlShowAllArrowsDefault ?? true,
       autoAnalysis: savedSettings.autoAnalysis,
       analysisMode: false,
     };
@@ -89,6 +93,7 @@ export const useChessBot = (
   const [isAiVsAiPaused, setIsAiVsAiPaused] = useState(false);
   const [engineNotice, setEngineNotice] = useState<string | null>(null);
   const [engineInsights, setEngineInsights] = useState<EngineInsight[]>([]);
+  const [wdlArrowScores, setWdlArrowScores] = useState<WdlArrowScore[]>([]);
   const analysisTimeoutRef = useRef<number | null>(null);
   const analysisInFlightRef = useRef(false);
   const lastAnalyzedFenRef = useRef<string | null>(null);
@@ -350,6 +355,114 @@ export const useChessBot = (
     [buildPredictionLine],
   );
 
+  const buildWdlPolicyArrows = useCallback(
+    async (params: {
+      fen: string;
+      analysisDepth: number;
+      preferredEngine: AIEngine;
+      preferredAnalysis: StockfishResponse;
+    }): Promise<{ arrows: AnalysisArrow[]; scores: WdlArrowScore[] }> => {
+      const { fen, analysisDepth, preferredEngine, preferredAnalysis } = params;
+      const board = new Chess(fen);
+      const sideToMove = board.turn();
+      const candidateMoves = buildPredictionLine(
+        preferredEngine,
+        preferredAnalysis,
+      ).slice(0, 3);
+
+      if (candidateMoves.length === 0) {
+        return { arrows: [], scores: [] };
+      }
+
+      const baseWdl = estimateWdl(
+        preferredAnalysis.evaluation,
+        preferredAnalysis.mate,
+      );
+      const baseLoss = sideToMove === "w" ? baseWdl.loss : baseWdl.win;
+      const policyDepth = Math.max(6, Math.min(8, analysisDepth - 2));
+
+      const scored = await Promise.all(
+        candidateMoves.map(async (move) => {
+          const parsed = parseMove(move);
+          if (!parsed) return null;
+
+          const nextBoard = new Chess(fen);
+          try {
+            nextBoard.move(move);
+          } catch {
+            return null;
+          }
+
+          const next = await getSafeAnalysis(
+            nextBoard.fen(),
+            policyDepth,
+            preferredEngine,
+          );
+          const nextWdl = estimateWdl(
+            next.analysis.evaluation,
+            next.analysis.mate,
+          );
+          const winChance = sideToMove === "w" ? nextWdl.win : nextWdl.loss;
+          const lossChance = sideToMove === "w" ? nextWdl.loss : nextWdl.win;
+
+          return {
+            from: parsed.from,
+            to: parsed.to,
+            winChance,
+            lossChance,
+          };
+        }),
+      );
+
+      const valid = scored.filter((item): item is NonNullable<typeof item> =>
+        Boolean(item),
+      );
+      if (valid.length === 0) {
+        return { arrows: [], scores: [] };
+      }
+
+      const bestWin = Math.max(...valid.map((item) => item.winChance));
+      const scores: WdlArrowScore[] = valid.map((item) => {
+        const winDrop = bestWin - item.winChance;
+        const lossSpike = item.lossChance - baseLoss;
+
+        let color = "#22c55e"; // Good: keeps WDL stable
+        let verdict: WdlArrowScore["verdict"] = "safe";
+        if (lossSpike >= 12 || winDrop >= 15) {
+          color = "#ef4444"; // Blunder: loss jumps hard
+          verdict = "blunder";
+        } else if (winDrop <= 2) {
+          color = "#3b82f6"; // Best/near-best
+          verdict = "best";
+        } else if (lossSpike >= 7 || winDrop >= 8) {
+          verdict = "risky";
+        }
+
+        return {
+          move: `${item.from}${item.to}`,
+          win: item.winChance,
+          draw: Math.max(0, 100 - item.winChance - item.lossChance),
+          loss: item.lossChance,
+          deltaLoss: Math.round(lossSpike),
+          quality: Math.max(
+            0,
+            100 - (Math.max(winDrop, 0) * 3 + Math.max(lossSpike, 0) * 2),
+          ),
+          verdict,
+          color,
+        };
+      });
+      scores.sort((a, b) => b.quality - a.quality);
+      const arrows: AnalysisArrow[] = scores.map((score) => ({
+        from: score.move.slice(0, 2) as Square,
+        to: score.move.slice(2, 4) as Square,
+        color: score.color,
+      }));
+      return { arrows, scores };
+    },
+    [buildPredictionLine, parseMove, getSafeAnalysis],
+  );
+
   const handleAnalyzePosition = useCallback(
     async (options?: {
       force?: boolean;
@@ -397,6 +510,8 @@ export const useChessBot = (
           results[0];
         const safeMove = pickSafeMove(results, chess.turn());
         const allowArrows = shouldRenderArrows || options?.forceArrows === true;
+        const useWdlPolicyArrows =
+          options?.forceArrows === true && settings.wdlPolicyArrows;
         setAnalysis(preferredResult.analysis);
 
         if (settings.analysisEngineMode === "single") {
@@ -412,7 +527,24 @@ export const useChessBot = (
               )
             : null;
           setHintMove(singleBest);
-          createAnalysisArrows(singleBest, { force: allowArrows });
+          if (allowArrows && useWdlPolicyArrows) {
+            const wdlArrows = await buildWdlPolicyArrows({
+              fen: targetFen,
+              analysisDepth,
+              preferredEngine: preferredResult.engineUsed,
+              preferredAnalysis: preferredResult.analysis,
+            });
+            if (wdlArrows.arrows.length > 0) {
+              setAnalysisArrows(wdlArrows.arrows);
+              setWdlArrowScores(wdlArrows.scores);
+            } else {
+              createAnalysisArrows(singleBest, { force: allowArrows });
+              setWdlArrowScores([]);
+            }
+          } else {
+            createAnalysisArrows(singleBest, { force: allowArrows });
+            setWdlArrowScores([]);
+          }
         } else {
           const insights = results.map(({ requestedEngine, analysis }) =>
             toEngineInsight(requestedEngine, analysis),
@@ -422,6 +554,59 @@ export const useChessBot = (
 
           if (!allowArrows) {
             setAnalysisArrows([]);
+            setWdlArrowScores([]);
+          } else if (useWdlPolicyArrows) {
+            const wdlArrows = await buildWdlPolicyArrows({
+              fen: targetFen,
+              analysisDepth,
+              preferredEngine: preferredResult.engineUsed,
+              preferredAnalysis: preferredResult.analysis,
+            });
+            if (wdlArrows.arrows.length > 0) {
+              setAnalysisArrows(wdlArrows.arrows);
+              setWdlArrowScores(wdlArrows.scores);
+            } else if (settings.analysisEngineMode === "safe") {
+              const parsedSafe = safeMove ? parseMove(safeMove) : null;
+              setAnalysisArrows(
+                parsedSafe
+                  ? [
+                      {
+                        from: parsedSafe.from,
+                        to: parsedSafe.to,
+                        color: "#facc15",
+                      },
+                    ]
+                  : [],
+              );
+              setWdlArrowScores([]);
+            } else {
+              const arrowColors: Record<AIEngine, string> = {
+                "stockfish-online": "#7fb069",
+                "chess-api": "#3b82f6",
+              };
+              const parsedArrows = results
+                .map((result) => {
+                  const bestMove = engineClients[
+                    result.engineUsed
+                  ].extractMoveFromString(result.analysis.bestmove || "");
+                  const parsed = bestMove ? parseMove(bestMove) : null;
+                  if (!parsed) return null;
+                  return {
+                    from: parsed.from,
+                    to: parsed.to,
+                    color: arrowColors[result.requestedEngine],
+                  } as AnalysisArrow;
+                })
+                .filter((arrow): arrow is AnalysisArrow => Boolean(arrow));
+              const arrows =
+                parsedArrows.length >= 2 &&
+                parsedArrows[0].from === parsedArrows[1].from &&
+                parsedArrows[0].to === parsedArrows[1].to
+                  ? [{ ...parsedArrows[0], color: "#facc15" }]
+                  : parsedArrows;
+              setAnalysisArrows(arrows);
+              setWdlArrowScores([]);
+            }
           } else if (settings.analysisEngineMode === "safe") {
             const parsedSafe = safeMove ? parseMove(safeMove) : null;
             setAnalysisArrows(
@@ -435,6 +620,7 @@ export const useChessBot = (
                   ]
                 : [],
             );
+            setWdlArrowScores([]);
           } else {
             const arrowColors: Record<AIEngine, string> = {
               "stockfish-online": "#7fb069",
@@ -462,6 +648,7 @@ export const useChessBot = (
                 ? [{ ...parsedArrows[0], color: "#facc15" }]
                 : parsedArrows;
             setAnalysisArrows(arrows);
+            setWdlArrowScores([]);
           }
         }
 
@@ -497,6 +684,7 @@ export const useChessBot = (
       chess,
       settings,
       shouldRenderArrows,
+      buildWdlPolicyArrows,
       createAnalysisArrows,
       getSafeAnalysis,
       pickSafeMove,
@@ -541,6 +729,7 @@ export const useChessBot = (
           updateGameState();
           setHintMove(null); // Clear hint after move
           setAnalysisArrows([]);
+          setWdlArrowScores([]);
 
           // Enhanced feedback for moves
           if (move.captured) {
@@ -753,6 +942,7 @@ export const useChessBot = (
         results[0];
       const safeMove = pickSafeMove(results, chess.turn());
       const allowArrows = shouldRenderArrows || settings.showAnalysisArrows;
+      const useWdlPolicyArrows = allowArrows && settings.wdlPolicyArrows;
       setAnalysis(preferredResult.analysis);
 
       if (settings.analysisEngineMode === "single") {
@@ -762,7 +952,24 @@ export const useChessBot = (
             )
           : null;
         setHintMove(cleanMove);
-        createAnalysisArrows(cleanMove, { force: allowArrows });
+        if (useWdlPolicyArrows) {
+          const wdlArrows = await buildWdlPolicyArrows({
+            fen: chess.fen(),
+            analysisDepth,
+            preferredEngine: preferredResult.engineUsed,
+            preferredAnalysis: preferredResult.analysis,
+          });
+          if (wdlArrows.arrows.length > 0) {
+            setAnalysisArrows(wdlArrows.arrows);
+            setWdlArrowScores(wdlArrows.scores);
+          } else {
+            createAnalysisArrows(cleanMove, { force: allowArrows });
+            setWdlArrowScores([]);
+          }
+        } else {
+          createAnalysisArrows(cleanMove, { force: allowArrows });
+          setWdlArrowScores([]);
+        }
         setEngineInsights([
           toEngineInsight(preferredResult.engineUsed, preferredResult.analysis),
         ]);
@@ -776,6 +983,59 @@ export const useChessBot = (
 
         if (!allowArrows) {
           setAnalysisArrows([]);
+          setWdlArrowScores([]);
+        } else if (useWdlPolicyArrows) {
+          const wdlArrows = await buildWdlPolicyArrows({
+            fen: chess.fen(),
+            analysisDepth,
+            preferredEngine: preferredResult.engineUsed,
+            preferredAnalysis: preferredResult.analysis,
+          });
+          if (wdlArrows.arrows.length > 0) {
+            setAnalysisArrows(wdlArrows.arrows);
+            setWdlArrowScores(wdlArrows.scores);
+          } else if (settings.analysisEngineMode === "safe") {
+            const parsedSafe = safeMove ? parseMove(safeMove) : null;
+            setAnalysisArrows(
+              parsedSafe
+                ? [
+                    {
+                      from: parsedSafe.from,
+                      to: parsedSafe.to,
+                      color: "#facc15",
+                    },
+                  ]
+                : [],
+            );
+            setWdlArrowScores([]);
+          } else {
+            const arrowColors: Record<AIEngine, string> = {
+              "stockfish-online": "#7fb069",
+              "chess-api": "#3b82f6",
+            };
+            const parsedArrows = results
+              .map((result) => {
+                const bestMove = engineClients[
+                  result.engineUsed
+                ].extractMoveFromString(result.analysis.bestmove || "");
+                const parsed = bestMove ? parseMove(bestMove) : null;
+                if (!parsed) return null;
+                return {
+                  from: parsed.from,
+                  to: parsed.to,
+                  color: arrowColors[result.requestedEngine],
+                } as AnalysisArrow;
+              })
+              .filter((arrow): arrow is AnalysisArrow => Boolean(arrow));
+            const arrows =
+              parsedArrows.length >= 2 &&
+              parsedArrows[0].from === parsedArrows[1].from &&
+              parsedArrows[0].to === parsedArrows[1].to
+                ? [{ ...parsedArrows[0], color: "#facc15" }]
+                : parsedArrows;
+            setAnalysisArrows(arrows);
+            setWdlArrowScores([]);
+          }
         } else if (settings.analysisEngineMode === "safe") {
           const parsedSafe = safeMove ? parseMove(safeMove) : null;
           setAnalysisArrows(
@@ -783,6 +1043,7 @@ export const useChessBot = (
               ? [{ from: parsedSafe.from, to: parsedSafe.to, color: "#facc15" }]
               : [],
           );
+          setWdlArrowScores([]);
         } else {
           const arrowColors: Record<AIEngine, string> = {
             "stockfish-online": "#7fb069",
@@ -809,6 +1070,7 @@ export const useChessBot = (
               ? [{ ...parsedArrows[0], color: "#facc15" }]
               : parsedArrows;
           setAnalysisArrows(arrows);
+          setWdlArrowScores([]);
         }
       }
 
@@ -839,6 +1101,7 @@ export const useChessBot = (
     chess,
     settings,
     shouldRenderArrows,
+    buildWdlPolicyArrows,
     createAnalysisArrows,
     getSafeAnalysis,
     parseMove,
@@ -852,6 +1115,7 @@ export const useChessBot = (
     setAnalysis(null);
     setEngineInsights([]);
     setAnalysisArrows([]);
+    setWdlArrowScores([]);
     setHintMove(null);
     clearSelection();
     updateGameState();
@@ -863,6 +1127,7 @@ export const useChessBot = (
     setAnalysis(null);
     setEngineInsights([]);
     setAnalysisArrows([]);
+    setWdlArrowScores([]);
     setHintMove(null);
     clearSelection();
     setSettings((prev) => ({
@@ -880,6 +1145,7 @@ export const useChessBot = (
     setAnalysis(null);
     setEngineInsights([]);
     setAnalysisArrows([]);
+    setWdlArrowScores([]);
     setHintMove(null);
     clearSelection();
     setSettings((prev) => ({
@@ -903,6 +1169,7 @@ export const useChessBot = (
       setAnalysis(null);
       setEngineInsights([]);
       setAnalysisArrows([]);
+      setWdlArrowScores([]);
       setHintMove(null);
       clearSelection();
       updateGameState();
@@ -917,6 +1184,7 @@ export const useChessBot = (
         setAnalysis(null);
         setEngineInsights([]);
         setAnalysisArrows([]);
+        setWdlArrowScores([]);
         setHintMove(null);
         clearSelection();
         updateGameState();
@@ -952,6 +1220,10 @@ export const useChessBot = (
       // Clear arrows if analysis arrows are disabled
       if (newSettings.showAnalysisArrows === false) {
         setAnalysisArrows([]);
+        setWdlArrowScores([]);
+      }
+      if (newSettings.wdlPolicyArrows === false) {
+        setWdlArrowScores([]);
       }
 
       const shouldForceReanalyze =
@@ -959,6 +1231,7 @@ export const useChessBot = (
         newSettings.aiDepth !== undefined ||
         newSettings.aiEngine !== undefined ||
         newSettings.analysisEngineMode !== undefined ||
+        newSettings.wdlPolicyArrows !== undefined ||
         newSettings.battleEnabled !== undefined ||
         newSettings.battleOpponentEngine !== undefined;
 
@@ -1013,6 +1286,7 @@ export const useChessBot = (
         setAnalysis(null);
         setEngineInsights([]);
         setAnalysisArrows([]);
+        setWdlArrowScores([]);
         setHintMove(null);
         clearSelection();
         updateGameState();
@@ -1094,6 +1368,7 @@ export const useChessBot = (
   useEffect(() => {
     if (!shouldRenderArrows) {
       setAnalysisArrows([]);
+      setWdlArrowScores([]);
     }
   }, [shouldRenderArrows]);
 
@@ -1137,6 +1412,7 @@ export const useChessBot = (
     engineInsights,
     moveHistory,
     analysisArrows,
+    wdlArrowScores,
     hintMove,
     isAiVsAiPaused,
     engineNotice,

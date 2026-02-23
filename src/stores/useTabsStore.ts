@@ -40,6 +40,8 @@ const defaultSettings: GameSettings = {
   battleEnabled: false,
   battleOpponentEngine: "chess-api",
   showAnalysisArrows: true,
+  wdlPolicyArrows: true,
+  wdlShowAllArrowsDefault: true,
   autoAnalysis: false,
   analysisMode: false,
 };

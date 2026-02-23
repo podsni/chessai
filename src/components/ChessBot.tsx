@@ -6,7 +6,7 @@ import { MoveNotation } from "./MoveNotation";
 import { PgnLoadModal } from "./PgnLoadModal";
 import { EvaluationBar } from "./EvaluationBar";
 import { useChessBot } from "../hooks/useChessBot";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   BarChart3,
   Bot,
@@ -43,6 +43,12 @@ export function ChessBot({
   const [showPgnModal, setShowPgnModal] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [tempName, setTempName] = useState("");
+  const [selectedWdlMove, setSelectedWdlMove] = useState<string | null>(null);
+  const [showAllWdlArrows, setShowAllWdlArrows] = useState(true);
+  const [wdlArrowLimit, setWdlArrowLimit] = useState(3);
+  const [wdlSortBy, setWdlSortBy] = useState<"quality" | "win" | "safety">(
+    "quality",
+  );
 
   useEffect(() => {
     const checkMobile = () => {
@@ -67,6 +73,7 @@ export function ChessBot({
     isThinking,
     analysis,
     engineInsights,
+    wdlArrowScores,
     moveHistory,
     analysisArrows,
     hintMove,
@@ -97,6 +104,74 @@ export function ChessBot({
     (settings.mode === "human-vs-ai" &&
       chess.turn() === settings.humanColor[0]);
   const wdl = estimateWdl(analysis?.evaluation, analysis?.mate);
+  const orderedWdlArrowScores = useMemo(() => {
+    const scores = [...wdlArrowScores];
+    if (wdlSortBy === "win") {
+      scores.sort((a, b) => b.win - a.win || b.quality - a.quality);
+    } else if (wdlSortBy === "safety") {
+      scores.sort((a, b) => a.loss - b.loss || b.quality - a.quality);
+    } else {
+      scores.sort((a, b) => b.quality - a.quality);
+    }
+    return scores;
+  }, [wdlArrowScores, wdlSortBy]);
+  const visibleWdlArrowScores = useMemo(() => {
+    if (!settings.wdlPolicyArrows) return [];
+    const ranked = orderedWdlArrowScores.slice(0, Math.max(1, wdlArrowLimit));
+    if (showAllWdlArrows || !selectedWdlMove) return ranked;
+    return ranked.filter((score) => score.move === selectedWdlMove);
+  }, [
+    settings.wdlPolicyArrows,
+    showAllWdlArrows,
+    selectedWdlMove,
+    orderedWdlArrowScores,
+    wdlArrowLimit,
+  ]);
+  const visibleAnalysisArrows = useMemo(() => {
+    if (!settings.showAnalysisArrows) return [];
+    if (!settings.wdlPolicyArrows) return analysisArrows;
+    const allowedMoves = new Set(
+      visibleWdlArrowScores.map((score) => score.move),
+    );
+    if (allowedMoves.size === 0) return analysisArrows;
+    return analysisArrows.filter((arrow) =>
+      allowedMoves.has(`${arrow.from}${arrow.to}`),
+    );
+  }, [
+    analysisArrows,
+    settings.showAnalysisArrows,
+    settings.wdlPolicyArrows,
+    visibleWdlArrowScores,
+  ]);
+
+  useEffect(() => {
+    if (!settings.wdlPolicyArrows || wdlArrowScores.length === 0) {
+      setSelectedWdlMove(null);
+      setShowAllWdlArrows(settings.wdlShowAllArrowsDefault);
+      return;
+    }
+    if (settings.wdlShowAllArrowsDefault) {
+      setShowAllWdlArrows(true);
+      setSelectedWdlMove(null);
+      return;
+    }
+    if (showAllWdlArrows) return;
+    const ranked = orderedWdlArrowScores.slice(0, Math.max(1, wdlArrowLimit));
+    if (
+      !selectedWdlMove ||
+      !ranked.some((score) => score.move === selectedWdlMove)
+    ) {
+      setSelectedWdlMove(ranked[0].move);
+    }
+  }, [
+    wdlArrowScores,
+    settings.wdlPolicyArrows,
+    settings.wdlShowAllArrowsDefault,
+    selectedWdlMove,
+    showAllWdlArrows,
+    orderedWdlArrowScores,
+    wdlArrowLimit,
+  ]);
 
   return (
     <div className="page-shell min-h-screen">
@@ -280,9 +355,8 @@ export function ChessBot({
                     selectedSquare={selectedSquare}
                     availableMoves={availableMoves}
                     isFlipped={settings.boardOrientation === "black"}
-                    analysisArrows={
-                      settings.showAnalysisArrows ? analysisArrows : []
-                    }
+                    analysisArrows={visibleAnalysisArrows}
+                    arrowScores={visibleWdlArrowScores}
                     arePiecesDraggable={arePiecesDraggable}
                     humanColor={settings.humanColor}
                     aiColor={settings.aiColor}
@@ -471,6 +545,24 @@ export function ChessBot({
               isAiVsAiPaused={isAiVsAiPaused}
               engineNotice={engineNotice}
               engineInsights={engineInsights}
+              wdlArrowScores={orderedWdlArrowScores.slice(
+                0,
+                Math.max(1, wdlArrowLimit),
+              )}
+              selectedWdlMove={selectedWdlMove}
+              isShowingAllWdlArrows={showAllWdlArrows}
+              wdlArrowLimit={wdlArrowLimit}
+              onWdlArrowLimitChange={setWdlArrowLimit}
+              wdlSortBy={wdlSortBy}
+              onWdlSortByChange={setWdlSortBy}
+              onSelectWdlMove={(move) => {
+                setShowAllWdlArrows(false);
+                setSelectedWdlMove(move);
+              }}
+              onShowAllWdlArrows={() => {
+                setShowAllWdlArrows(true);
+                setSelectedWdlMove(null);
+              }}
               onPauseAiVsAi={handlePauseAiVsAi}
               onResumeAiVsAi={handleResumeAiVsAi}
             />

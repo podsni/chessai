@@ -1,7 +1,10 @@
 import { Chessboard } from "react-chessboard";
 import { Chess, Square } from "chess.js";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { AnalysisArrow as AnalysisArrowType } from "../types/chess";
+import {
+  AnalysisArrow as AnalysisArrowType,
+  WdlArrowScore,
+} from "../types/chess";
 
 interface ChessBoardProps {
   chess: Chess;
@@ -11,6 +14,7 @@ interface ChessBoardProps {
   availableMoves: Square[];
   isFlipped: boolean;
   analysisArrows: AnalysisArrowType[];
+  arrowScores?: WdlArrowScore[];
   arePiecesDraggable: boolean;
   humanColor?: "white" | "black";
   aiColor?: "white" | "black";
@@ -25,6 +29,7 @@ export function ChessBoard({
   availableMoves,
   isFlipped,
   analysisArrows,
+  arrowScores = [],
   arePiecesDraggable,
   humanColor = "white",
   aiColor: _aiColor = "black",
@@ -324,6 +329,37 @@ export function ChessBoard({
     ],
   );
 
+  const scoreBadges = useMemo(() => {
+    if (arrowScores.length === 0) return [];
+    const squareSize = boardSize / 8;
+
+    const getSquarePos = (square: string) => {
+      const file = square.charCodeAt(0) - 97; // a-h => 0-7
+      const rank = parseInt(square[1], 10); // 1-8
+      let col = file;
+      let row = 8 - rank;
+      if (isFlipped) {
+        col = 7 - col;
+        row = 7 - row;
+      }
+      return { col, row };
+    };
+
+    return arrowScores.map((score) => {
+      const toSquare = score.move.slice(2, 4);
+      const { col, row } = getSquarePos(toSquare);
+      const left = col * squareSize + squareSize * 0.62;
+      const top = row * squareSize + squareSize * 0.12;
+      return {
+        key: score.move,
+        left,
+        top,
+        color: score.color,
+        quality: Math.round(score.quality),
+      };
+    });
+  }, [arrowScores, boardSize, isFlipped]);
+
   return (
     <div className="relative w-full flex flex-col items-center">
       {/* Enhanced Mobile Instructions */}
@@ -351,7 +387,31 @@ export function ChessBoard({
         ref={boardContainerRef}
         className="chess-board-container w-full flex justify-center"
       >
-        <Chessboard options={chessboardOptions} />
+        <div
+          className="relative"
+          style={{ width: `${boardSize}px`, height: `${boardSize}px` }}
+        >
+          <Chessboard options={chessboardOptions} />
+          {scoreBadges.length > 0 && (
+            <div className="pointer-events-none absolute inset-0 z-20">
+              {scoreBadges.map((badge) => (
+                <div
+                  key={badge.key}
+                  className="absolute rounded px-1 py-0.5 text-[10px] font-bold text-white shadow-md"
+                  style={{
+                    left: `${badge.left}px`,
+                    top: `${badge.top}px`,
+                    transform: "translate(-50%, -50%)",
+                    backgroundColor: badge.color,
+                    border: "1px solid rgba(15,23,42,0.7)",
+                  }}
+                >
+                  {badge.quality}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Enhanced Player indicators with Human/AI labels */}

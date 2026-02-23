@@ -14,6 +14,7 @@ import type {
   EngineInsight,
   GameSettings,
   GameMode,
+  WdlArrowScore,
 } from "../types/chess";
 
 interface GameControlsProps {
@@ -42,6 +43,15 @@ interface GameControlsProps {
   isAiVsAiPaused: boolean;
   engineNotice: string | null;
   engineInsights: EngineInsight[];
+  wdlArrowScores: WdlArrowScore[];
+  selectedWdlMove: string | null;
+  isShowingAllWdlArrows: boolean;
+  wdlArrowLimit: number;
+  onWdlArrowLimitChange: (value: number) => void;
+  wdlSortBy: "quality" | "win" | "safety";
+  onWdlSortByChange: (value: "quality" | "win" | "safety") => void;
+  onSelectWdlMove: (move: string | null) => void;
+  onShowAllWdlArrows: () => void;
   onPauseAiVsAi: () => void;
   onResumeAiVsAi: () => void;
 }
@@ -72,6 +82,15 @@ export function GameControls({
   isAiVsAiPaused,
   engineNotice,
   engineInsights,
+  wdlArrowScores,
+  selectedWdlMove,
+  isShowingAllWdlArrows,
+  wdlArrowLimit,
+  onWdlArrowLimitChange,
+  wdlSortBy,
+  onWdlSortByChange,
+  onSelectWdlMove,
+  onShowAllWdlArrows,
   onPauseAiVsAi,
   onResumeAiVsAi,
 }: GameControlsProps) {
@@ -270,16 +289,16 @@ export function GameControls({
           {(settings.analysisMode || settings.mode === "ai-vs-ai") && (
             <div className="mt-2 text-[11px] text-gray-300 flex flex-wrap gap-3">
               <span className="inline-flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#7fb069]" />
-                Stockfish arrow
-              </span>
-              <span className="inline-flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-[#3b82f6]" />
-                Chess-API arrow
+                WDL high win (best)
               </span>
               <span className="inline-flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#facc15]" />
-                Same move (consensus)
+                <span className="w-2 h-2 rounded-full bg-[#22c55e]" />
+                WDL stable (safe)
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
+                WDL loss spike (blunder)
               </span>
             </div>
           )}
@@ -699,6 +718,45 @@ export function GameControls({
                 Auto Analysis After Each Move
               </label>
             </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="wdlPolicyArrows"
+                checked={settings.wdlPolicyArrows}
+                onChange={(e) =>
+                  onSettingsChange({ wdlPolicyArrows: e.target.checked })
+                }
+                className="chess-checkbox"
+              />
+              <label
+                htmlFor="wdlPolicyArrows"
+                className="text-sm"
+                style={{ color: "var(--text-light)" }}
+              >
+                WDL Policy Arrows (score-based)
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="wdlShowAllArrowsDefault"
+                checked={settings.wdlShowAllArrowsDefault}
+                onChange={(e) =>
+                  onSettingsChange({
+                    wdlShowAllArrowsDefault: e.target.checked,
+                  })
+                }
+                className="chess-checkbox"
+              />
+              <label
+                htmlFor="wdlShowAllArrowsDefault"
+                className="text-sm"
+                style={{ color: "var(--text-light)" }}
+              >
+                Default Show All WDL Arrows
+              </label>
+            </div>
           </div>
         </div>
 
@@ -759,6 +817,109 @@ export function GameControls({
                   <span className="text-white">L {wdl.loss}%</span>
                 </div>
               )}
+              {!isThinking &&
+                settings.wdlPolicyArrows &&
+                wdlArrowScores.length > 0 && (
+                  <div className="mt-3 rounded border border-gray-700 bg-gray-900/50 p-2">
+                    <div className="text-xs text-gray-300 mb-2">
+                      Arrow Scores (Top Recommendation:{" "}
+                      <span className="text-white font-semibold">
+                        {wdlArrowScores[0]?.move}
+                      </span>
+                      )
+                    </div>
+                    <div className="mb-2 flex items-center gap-2">
+                      <label className="text-xs text-gray-300">
+                        Arrows:
+                        <select
+                          value={wdlArrowLimit}
+                          onChange={(e) =>
+                            onWdlArrowLimitChange(parseInt(e.target.value, 10))
+                          }
+                          className="ml-1 bg-gray-800 text-white rounded px-1 py-0.5 border border-gray-600"
+                        >
+                          <option value={1}>1</option>
+                          <option value={2}>2</option>
+                          <option value={3}>3</option>
+                        </select>
+                      </label>
+                      <label className="text-xs text-gray-300">
+                        Sort:
+                        <select
+                          value={wdlSortBy}
+                          onChange={(e) =>
+                            onWdlSortByChange(
+                              e.target.value as "quality" | "win" | "safety",
+                            )
+                          }
+                          className="ml-1 bg-gray-800 text-white rounded px-1 py-0.5 border border-gray-600"
+                        >
+                          <option value="quality">Score</option>
+                          <option value="win">Win %</option>
+                          <option value="safety">Safe (Low Loss)</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div className="mb-2 flex items-center gap-2">
+                      <button
+                        onClick={() =>
+                          onSelectWdlMove(wdlArrowScores[0]?.move ?? null)
+                        }
+                        className={`chess-button text-xs px-2 py-1 ${
+                          !isShowingAllWdlArrows ? "" : "secondary"
+                        }`}
+                      >
+                        Show Top Arrow
+                      </button>
+                      <button
+                        onClick={onShowAllWdlArrows}
+                        className={`chess-button text-xs px-2 py-1 ${
+                          isShowingAllWdlArrows ? "" : "secondary"
+                        }`}
+                      >
+                        Show All Arrows
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      {wdlArrowScores.slice(0, 3).map((item, index) => (
+                        <button
+                          key={item.move}
+                          onClick={() => onSelectWdlMove(item.move)}
+                          className={`w-full text-left flex items-center justify-between rounded px-2 py-1 text-[11px] border ${
+                            !isShowingAllWdlArrows &&
+                            selectedWdlMove === item.move
+                              ? "bg-blue-900/40 border-blue-500/60"
+                              : "bg-gray-800/70 border-gray-700/70"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400 w-4 text-right">
+                              {index + 1}.
+                            </span>
+                            <span
+                              className="inline-block h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <span className="font-mono text-white">
+                              {item.move}
+                            </span>
+                            <span className="text-gray-300 capitalize">
+                              {item.verdict}
+                            </span>
+                          </div>
+                          <div className="text-gray-300">
+                            Score{" "}
+                            <span className="text-white">{item.quality}</span> ·
+                            W {item.win}% · L {item.loss}%
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 text-[11px] text-gray-400">
+                      Tap row to focus one arrow on board.
+                    </div>
+                  </div>
+                )}
             </div>
           )}
         </div>

@@ -24,6 +24,8 @@ interface GameSettings {
   battleEnabled: boolean;
   battleOpponentEngine: "stockfish-online" | "chess-api";
   showAnalysisArrows: boolean;
+  wdlPolicyArrows: boolean;
+  wdlShowAllArrowsDefault: boolean;
   autoAnalysis: boolean;
   aiDepth: number;
 }
@@ -125,6 +127,8 @@ class GameStorage {
         battleEnabled: false,
         battleOpponentEngine: "chess-api",
         showAnalysisArrows: true,
+        wdlPolicyArrows: true,
+        wdlShowAllArrowsDefault: true,
         autoAnalysis: false,
         aiDepth: 10,
       };
@@ -146,6 +150,8 @@ class GameStorage {
         battleEnabled: false,
         battleOpponentEngine: "chess-api",
         showAnalysisArrows: true,
+        wdlPolicyArrows: true,
+        wdlShowAllArrowsDefault: true,
         autoAnalysis: false,
         aiDepth: 10,
       };
