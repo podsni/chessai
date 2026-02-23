@@ -2,6 +2,7 @@ import { ChessBoard } from "./ChessBoard";
 import { GameControls } from "./GameControls";
 import { SettingsModal } from "./SettingsModal";
 import { FenDisplay } from "./FenDisplay";
+import { AnalysisTimelineChart } from "./AnalysisTimelineChart";
 import { MoveNotation } from "./MoveNotation";
 import { PgnLoadModal } from "./PgnLoadModal";
 import { EvaluationBar } from "./EvaluationBar";
@@ -78,6 +79,8 @@ export function ChessBot({
     engineInsights,
     wdlArrowScores,
     evaluationTrend,
+    analysisTimeline,
+    liveAnalysisSeries,
     moveHistory,
     analysisArrows,
     hintMove,
@@ -486,6 +489,11 @@ export function ChessBot({
                 />
                 <FenDisplay fen={chess.fen()} showLabel={!isMobile} />
               </div>
+
+              <AnalysisTimelineChart
+                timeline={analysisTimeline}
+                liveSeries={liveAnalysisSeries}
+              />
 
               {/* Analysis Display */}
               {(analysis || hintMove) && (

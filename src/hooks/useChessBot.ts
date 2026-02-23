@@ -10,7 +10,11 @@ import {
   getAiMoveDepthLimit,
   getAnalysisDepthLimit,
 } from "../utils/engineConstraints";
-import { estimateWdl, getEvaluationBarPercent } from "../utils/evaluation";
+import {
+  cpToWinChance,
+  estimateWdl,
+  getEvaluationBarPercent,
+} from "../utils/evaluation";
 import {
   canMoveToSquare,
   getPromotionForMove,
@@ -26,6 +30,9 @@ import type {
   AnalysisArrow,
   PersistedGameState,
   WdlArrowScore,
+  AnalysisTimelinePoint,
+  LiveAnalysisPoint,
+  MoveQualityClass,
 } from "../types/chess";
 
 const stockfishApi = new StockfishAPI();
@@ -34,6 +41,14 @@ const chessApiEngine = new ChessApiEngine();
 const engineClients = {
   "stockfish-online": stockfishApi,
   "chess-api": chessApiEngine,
+};
+
+type AnalysisFetchResult = {
+  requestedEngine: AIEngine;
+  analysis: StockfishResponse;
+  engineUsed: AIEngine;
+  fallbackUsed: boolean;
+  localFallbackUsed: boolean;
 };
 
 export const useChessBot = (
@@ -100,6 +115,12 @@ export const useChessBot = (
   const [engineInsights, setEngineInsights] = useState<EngineInsight[]>([]);
   const [wdlArrowScores, setWdlArrowScores] = useState<WdlArrowScore[]>([]);
   const [evaluationTrend, setEvaluationTrend] = useState<number[]>([]);
+  const [analysisTimeline, setAnalysisTimeline] = useState<
+    AnalysisTimelinePoint[]
+  >([]);
+  const [liveAnalysisSeries, setLiveAnalysisSeries] = useState<
+    LiveAnalysisPoint[]
+  >([]);
   const analysisTimeoutRef = useRef<number | null>(null);
   const analysisInFlightRef = useRef(false);
   const lastAnalyzedFenRef = useRef<string | null>(null);
@@ -194,6 +215,141 @@ export const useChessBot = (
     }
     return null;
   }, []);
+
+  const classifyMoveQuality = useCallback(
+    (swingForMoverCp: number): MoveQualityClass => {
+      if (swingForMoverCp >= 180) return "brilliant";
+      if (swingForMoverCp >= 90) return "great";
+      if (swingForMoverCp >= 30) return "best";
+      if (swingForMoverCp >= -20) return "good";
+      if (swingForMoverCp >= -80) return "inaccuracy";
+      if (swingForMoverCp >= -180) return "mistake";
+      return "blunder";
+    },
+    [],
+  );
+
+  const recordAnalysisSample = useCallback(
+    (
+      fen: string,
+      results: AnalysisFetchResult[],
+      preferred: StockfishResponse,
+    ) => {
+      const toCp = (analysisData?: StockfishResponse): number | undefined => {
+        if (!analysisData) return undefined;
+        if (analysisData.mate !== null && analysisData.mate !== undefined) {
+          return analysisData.mate > 0 ? 3200 : -3200;
+        }
+        if (
+          analysisData.evaluation === null ||
+          analysisData.evaluation === undefined
+        ) {
+          return undefined;
+        }
+        return analysisData.evaluation;
+      };
+
+      const clamp = (value: number, min: number, max: number) =>
+        Math.max(min, Math.min(max, value));
+
+      const byEngine = new Map<AIEngine, StockfishResponse>();
+      for (const item of results) {
+        byEngine.set(item.requestedEngine, item.analysis);
+      }
+
+      const stockfishCp = toCp(byEngine.get("stockfish-online"));
+      const chessApiCp = toCp(byEngine.get("chess-api"));
+      const preferredCp = toCp(preferred) ?? 0;
+      const consensusCp =
+        stockfishCp !== undefined && chessApiCp !== undefined
+          ? Math.round((stockfishCp + chessApiCp) / 2)
+          : (stockfishCp ?? chessApiCp ?? preferredCp);
+      const deltaCp =
+        stockfishCp !== undefined && chessApiCp !== undefined
+          ? Math.abs(stockfishCp - chessApiCp)
+          : 0;
+      const confidence =
+        stockfishCp !== undefined && chessApiCp !== undefined
+          ? clamp(Math.round(100 - deltaCp / 6), 25, 100)
+          : results.some((item) => item.localFallbackUsed)
+            ? 45
+            : 68;
+      const consensusWdl = estimateWdl(
+        consensusCp,
+        undefined,
+        cpToWinChance(consensusCp),
+      );
+      const consensusPercent = getEvaluationBarPercent(
+        consensusCp,
+        undefined,
+        cpToWinChance(consensusCp),
+      );
+      const stockfishPercent =
+        stockfishCp !== undefined
+          ? getEvaluationBarPercent(
+              stockfishCp,
+              undefined,
+              cpToWinChance(stockfishCp),
+            )
+          : undefined;
+      const chessApiPercent =
+        chessApiCp !== undefined
+          ? getEvaluationBarPercent(
+              chessApiCp,
+              undefined,
+              cpToWinChance(chessApiCp),
+            )
+          : undefined;
+
+      const ply = moveHistory.length;
+      const moveNumber = Math.ceil(ply / 2);
+
+      setAnalysisTimeline((prev) => {
+        const last = prev[prev.length - 1];
+        const mover: "w" | "b" = chess.turn() === "w" ? "b" : "w";
+        const swingForMoverCp =
+          !last || last.fen === fen
+            ? 0
+            : mover === "w"
+              ? consensusCp - last.consensusCp
+              : last.consensusCp - consensusCp;
+        const quality = classifyMoveQuality(swingForMoverCp);
+        const nextPoint: AnalysisTimelinePoint = {
+          fen,
+          ply,
+          moveNumber,
+          consensusCp,
+          stockfishCp,
+          chessApiCp,
+          deltaCp,
+          confidence,
+          wdlWin: consensusWdl.win,
+          wdlDraw: consensusWdl.draw,
+          wdlLoss: consensusWdl.loss,
+          quality: last && last.fen === fen ? last.quality : quality,
+        };
+
+        if (last && last.fen === fen) {
+          return [...prev.slice(0, -1), nextPoint];
+        }
+        return [...prev.slice(-119), nextPoint];
+      });
+
+      setLiveAnalysisSeries((prev) => {
+        return [
+          ...prev.slice(-79),
+          {
+            timestamp: Date.now(),
+            consensus: consensusPercent,
+            stockfish: stockfishPercent,
+            chessApi: chessApiPercent,
+            quality: "good",
+          },
+        ];
+      });
+    },
+    [chess, classifyMoveQuality, moveHistory.length],
+  );
 
   const createAnalysisArrows = useCallback(
     (bestMove: string | null, options?: { force?: boolean }) => {
@@ -544,7 +700,7 @@ export const useChessBot = (
             ? [settings.aiEngine]
             : ["stockfish-online", "chess-api"];
 
-        const results = await Promise.all(
+        const results: AnalysisFetchResult[] = await Promise.all(
           engines.map(async (engine) => {
             const result = await getSafeAnalysis(
               targetFen,
@@ -561,6 +717,7 @@ export const useChessBot = (
         const preferredResult =
           results.find((r) => r.requestedEngine === settings.aiEngine) ||
           results[0];
+        recordAnalysisSample(targetFen, results, preferredResult.analysis);
         const safeMove = pickSafeMove(results, chess.turn());
         const allowArrows = shouldRenderArrows || options?.forceArrows === true;
         const useWdlPolicyArrows =
@@ -773,6 +930,7 @@ export const useChessBot = (
       getSafeAnalysis,
       pickSafeMove,
       parseMove,
+      recordAnalysisSample,
       toEngineInsight,
     ],
   );
@@ -1024,7 +1182,7 @@ export const useChessBot = (
         settings.analysisEngineMode === "single"
           ? [settings.aiEngine]
           : ["stockfish-online", "chess-api"];
-      const results = await Promise.all(
+      const results: AnalysisFetchResult[] = await Promise.all(
         engines.map(async (engine) => {
           const result = await getSafeAnalysis(
             chess.fen(),
@@ -1038,6 +1196,7 @@ export const useChessBot = (
       const preferredResult =
         results.find((r) => r.requestedEngine === settings.aiEngine) ||
         results[0];
+      recordAnalysisSample(chess.fen(), results, preferredResult.analysis);
       const safeMove = pickSafeMove(results, chess.turn());
       const allowArrows = shouldRenderArrows || settings.showAnalysisArrows;
       const useWdlPolicyArrows = allowArrows && settings.wdlPolicyArrows;
@@ -1235,6 +1394,7 @@ export const useChessBot = (
     getSafeAnalysis,
     parseMove,
     pickSafeMove,
+    recordAnalysisSample,
     toEngineInsight,
   ]);
 
@@ -1247,6 +1407,8 @@ export const useChessBot = (
     setEngineInsights([]);
     setAnalysisArrows([]);
     setWdlArrowScores([]);
+    setAnalysisTimeline([]);
+    setLiveAnalysisSeries([]);
     setHintMove(null);
     clearSelection();
     updateGameState();
@@ -1261,6 +1423,8 @@ export const useChessBot = (
     setEngineInsights([]);
     setAnalysisArrows([]);
     setWdlArrowScores([]);
+    setAnalysisTimeline([]);
+    setLiveAnalysisSeries([]);
     setHintMove(null);
     clearSelection();
     setSettings((prev) => ({
@@ -1281,6 +1445,8 @@ export const useChessBot = (
     setEngineInsights([]);
     setAnalysisArrows([]);
     setWdlArrowScores([]);
+    setAnalysisTimeline([]);
+    setLiveAnalysisSeries([]);
     setHintMove(null);
     clearSelection();
     setSettings((prev) => ({
@@ -1307,6 +1473,8 @@ export const useChessBot = (
       setEngineInsights([]);
       setAnalysisArrows([]);
       setWdlArrowScores([]);
+      setAnalysisTimeline([]);
+      setLiveAnalysisSeries([]);
       setHintMove(null);
       clearSelection();
       updateGameState();
@@ -1324,6 +1492,8 @@ export const useChessBot = (
         setEngineInsights([]);
         setAnalysisArrows([]);
         setWdlArrowScores([]);
+        setAnalysisTimeline([]);
+        setLiveAnalysisSeries([]);
         setHintMove(null);
         clearSelection();
         updateGameState();
@@ -1428,6 +1598,8 @@ export const useChessBot = (
         setEngineInsights([]);
         setAnalysisArrows([]);
         setWdlArrowScores([]);
+        setAnalysisTimeline([]);
+        setLiveAnalysisSeries([]);
         setHintMove(null);
         clearSelection();
         updateGameState();
@@ -1568,6 +1740,8 @@ export const useChessBot = (
     analysisArrows,
     wdlArrowScores,
     evaluationTrend,
+    analysisTimeline,
+    liveAnalysisSeries,
     hintMove,
     isAiVsAiPaused,
     engineNotice,

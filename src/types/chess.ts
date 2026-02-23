@@ -49,6 +49,38 @@ export interface WdlArrowScore {
   color: string;
 }
 
+export type MoveQualityClass =
+  | "brilliant"
+  | "great"
+  | "best"
+  | "good"
+  | "inaccuracy"
+  | "mistake"
+  | "blunder";
+
+export interface LiveAnalysisPoint {
+  timestamp: number;
+  consensus: number;
+  stockfish?: number;
+  chessApi?: number;
+  quality: MoveQualityClass;
+}
+
+export interface AnalysisTimelinePoint {
+  fen: string;
+  ply: number;
+  moveNumber: number;
+  consensusCp: number;
+  stockfishCp?: number;
+  chessApiCp?: number;
+  deltaCp: number;
+  confidence: number;
+  wdlWin: number;
+  wdlDraw: number;
+  wdlLoss: number;
+  quality: MoveQualityClass;
+}
+
 export interface StockfishResponse {
   success: boolean;
   evaluation?: number;
