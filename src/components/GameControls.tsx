@@ -36,6 +36,7 @@ interface GameControlsProps {
   moveHistory: string[];
   evaluation?: number | null;
   mate?: number | null;
+  winChance?: number | null;
   bestMove?: string;
   hintMove?: string;
   isAnalysisMode: boolean;
@@ -50,6 +51,8 @@ interface GameControlsProps {
   onWdlArrowLimitChange: (value: number) => void;
   wdlSortBy: "quality" | "win" | "safety";
   onWdlSortByChange: (value: "quality" | "win" | "safety") => void;
+  wdlEngineFilter: "all" | AIEngine;
+  onWdlEngineFilterChange: (value: "all" | AIEngine) => void;
   onSelectWdlMove: (move: string | null) => void;
   onShowAllWdlArrows: () => void;
   onPauseAiVsAi: () => void;
@@ -74,6 +77,7 @@ export function GameControls({
   moveHistory,
   evaluation,
   mate,
+  winChance,
   bestMove,
   hintMove,
   isAnalysisMode,
@@ -89,6 +93,8 @@ export function GameControls({
   onWdlArrowLimitChange,
   wdlSortBy,
   onWdlSortByChange,
+  wdlEngineFilter,
+  onWdlEngineFilterChange,
   onSelectWdlMove,
   onShowAllWdlArrows,
   onPauseAiVsAi,
@@ -146,8 +152,10 @@ export function GameControls({
   const uiDepthLimit = getUiDepthLimit(settings);
   const aiMoveDepthLimit = getAiMoveDepthLimit(settings);
   const analysisDepthLimit = getAnalysisDepthLimit(settings);
-  const hasWdl = hasEvaluationData(evaluation, mate);
-  const wdl = hasWdl ? estimateWdl(evaluation ?? undefined, mate) : null;
+  const hasWdl = hasEvaluationData(evaluation, mate, winChance);
+  const wdl = hasWdl
+    ? estimateWdl(evaluation ?? undefined, mate, winChance)
+    : null;
 
   const buildPredictionSteps = (fen: string, moves: string[], maxSteps = 4) => {
     const board = new Chess(fen);
@@ -290,15 +298,15 @@ export function GameControls({
             <div className="mt-2 text-[11px] text-gray-300 flex flex-wrap gap-3">
               <span className="inline-flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-[#3b82f6]" />
-                WDL high win (best)
+                Stockfish best
               </span>
               <span className="inline-flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-[#22c55e]" />
-                WDL stable (safe)
+                Chess-API best
               </span>
               <span className="inline-flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
-                WDL loss spike (blunder)
+                Blunder (loss spike)
               </span>
             </div>
           )}
@@ -859,6 +867,22 @@ export function GameControls({
                           <option value="safety">Safe (Low Loss)</option>
                         </select>
                       </label>
+                      <label className="text-xs text-gray-300">
+                        Engine:
+                        <select
+                          value={wdlEngineFilter}
+                          onChange={(e) =>
+                            onWdlEngineFilterChange(
+                              e.target.value as "all" | AIEngine,
+                            )
+                          }
+                          className="ml-1 bg-gray-800 text-white rounded px-1 py-0.5 border border-gray-600"
+                        >
+                          <option value="all">All</option>
+                          <option value="stockfish-online">Stockfish</option>
+                          <option value="chess-api">Chess-API</option>
+                        </select>
+                      </label>
                     </div>
                     <div className="mb-2 flex items-center gap-2">
                       <button
@@ -883,7 +907,7 @@ export function GameControls({
                     <div className="space-y-1">
                       {wdlArrowScores.slice(0, 3).map((item, index) => (
                         <button
-                          key={item.move}
+                          key={`${item.engine}-${item.move}-${index}`}
                           onClick={() => onSelectWdlMove(item.move)}
                           className={`w-full text-left flex items-center justify-between rounded px-2 py-1 text-[11px] border ${
                             !isShowingAllWdlArrows &&
@@ -902,6 +926,11 @@ export function GameControls({
                             />
                             <span className="font-mono text-white">
                               {item.move}
+                            </span>
+                            <span className="text-[10px] text-gray-400">
+                              {item.engine === "stockfish-online"
+                                ? "Stockfish"
+                                : "Chess-API"}
                             </span>
                             <span className="text-gray-300 capitalize">
                               {item.verdict}

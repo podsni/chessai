@@ -38,6 +38,7 @@ export interface AnalysisArrow {
 }
 
 export interface WdlArrowScore {
+  engine: AIEngine;
   move: string;
   win: number;
   draw: number;
@@ -52,6 +53,7 @@ export interface StockfishResponse {
   success: boolean;
   evaluation?: number;
   mate?: number;
+  winChance?: number;
   bestmove?: string;
   continuation?: string;
 }

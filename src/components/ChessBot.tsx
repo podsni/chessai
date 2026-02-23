@@ -20,7 +20,7 @@ import {
   Smartphone,
   Target,
 } from "lucide-react";
-import type { PersistedGameState } from "../types/chess";
+import type { AIEngine, PersistedGameState } from "../types/chess";
 import { estimateWdl } from "../utils/evaluation";
 
 interface ChessBotProps {
@@ -49,6 +49,9 @@ export function ChessBot({
   const [wdlSortBy, setWdlSortBy] = useState<"quality" | "win" | "safety">(
     "quality",
   );
+  const [wdlEngineFilter, setWdlEngineFilter] = useState<"all" | AIEngine>(
+    "all",
+  );
 
   useEffect(() => {
     const checkMobile = () => {
@@ -74,6 +77,7 @@ export function ChessBot({
     analysis,
     engineInsights,
     wdlArrowScores,
+    evaluationTrend,
     moveHistory,
     analysisArrows,
     hintMove,
@@ -103,9 +107,16 @@ export function ChessBot({
     settings.mode === "human-vs-human" ||
     (settings.mode === "human-vs-ai" &&
       chess.turn() === settings.humanColor[0]);
-  const wdl = estimateWdl(analysis?.evaluation, analysis?.mate);
+  const wdl = estimateWdl(
+    analysis?.evaluation,
+    analysis?.mate,
+    analysis?.winChance,
+  );
   const orderedWdlArrowScores = useMemo(() => {
-    const scores = [...wdlArrowScores];
+    const scores =
+      wdlEngineFilter === "all"
+        ? [...wdlArrowScores]
+        : wdlArrowScores.filter((score) => score.engine === wdlEngineFilter);
     if (wdlSortBy === "win") {
       scores.sort((a, b) => b.win - a.win || b.quality - a.quality);
     } else if (wdlSortBy === "safety") {
@@ -114,7 +125,7 @@ export function ChessBot({
       scores.sort((a, b) => b.quality - a.quality);
     }
     return scores;
-  }, [wdlArrowScores, wdlSortBy]);
+  }, [wdlArrowScores, wdlSortBy, wdlEngineFilter]);
   const visibleWdlArrowScores = useMemo(() => {
     if (!settings.wdlPolicyArrows) return [];
     const ranked = orderedWdlArrowScores.slice(0, Math.max(1, wdlArrowLimit));
@@ -134,9 +145,20 @@ export function ChessBot({
       visibleWdlArrowScores.map((score) => score.move),
     );
     if (allowedMoves.size === 0) return analysisArrows;
-    return analysisArrows.filter((arrow) =>
+    const filtered = analysisArrows.filter((arrow) =>
       allowedMoves.has(`${arrow.from}${arrow.to}`),
     );
+    const byMove = new Map<string, (typeof filtered)[number][]>();
+    filtered.forEach((arrow) => {
+      const key = `${arrow.from}${arrow.to}`;
+      const list = byMove.get(key) || [];
+      list.push(arrow);
+      byMove.set(key, list);
+    });
+    return Array.from(byMove.values()).map((group) => {
+      if (group.length === 1) return group[0];
+      return { ...group[0], color: "#facc15" };
+    });
   }, [
     analysisArrows,
     settings.showAnalysisArrows,
@@ -344,6 +366,8 @@ export function ChessBot({
                   <EvaluationBar
                     evaluation={analysis?.evaluation}
                     mate={analysis?.mate}
+                    winChance={analysis?.winChance}
+                    trend={evaluationTrend}
                     isThinking={isThinking}
                   />
                 </div>
@@ -538,6 +562,7 @@ export function ChessBot({
               moveHistory={moveHistory}
               evaluation={analysis?.evaluation}
               mate={analysis?.mate}
+              winChance={analysis?.winChance}
               bestMove={analysis?.bestmove}
               hintMove={hintMove || undefined}
               isAnalysisMode={settings.analysisMode}
@@ -555,6 +580,8 @@ export function ChessBot({
               onWdlArrowLimitChange={setWdlArrowLimit}
               wdlSortBy={wdlSortBy}
               onWdlSortByChange={setWdlSortBy}
+              wdlEngineFilter={wdlEngineFilter}
+              onWdlEngineFilterChange={setWdlEngineFilter}
               onSelectWdlMove={(move) => {
                 setShowAllWdlArrows(false);
                 setSelectedWdlMove(move);

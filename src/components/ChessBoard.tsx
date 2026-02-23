@@ -113,15 +113,29 @@ export function ChessBoard({
   }, []);
 
   // Convert our analysis arrows to react-chessboard format
-  const customArrows = useMemo(
-    () =>
-      analysisArrows.map((arrow) => ({
-        startSquare: arrow.from as Square,
-        endSquare: arrow.to as Square,
-        color: arrow.color || "#7fb069",
-      })),
-    [analysisArrows],
-  );
+  const customArrows = useMemo(() => {
+    // react-chessboard uses start/end for arrow identity.
+    // Deduplicate identical move arrows to avoid duplicate React keys.
+    const grouped = new Map<string, AnalysisArrowType[]>();
+    analysisArrows.forEach((arrow) => {
+      const key = `${arrow.from}-${arrow.to}`;
+      const list = grouped.get(key) || [];
+      list.push(arrow);
+      grouped.set(key, list);
+    });
+
+    return Array.from(grouped.values()).map((group) => {
+      const base = group[0];
+      const hasDifferentColors = group.some(
+        (item) => (item.color || "#7fb069") !== (base.color || "#7fb069"),
+      );
+      return {
+        startSquare: base.from as Square,
+        endSquare: base.to as Square,
+        color: hasDifferentColors ? "#facc15" : base.color || "#7fb069",
+      };
+    });
+  }, [analysisArrows]);
 
   // Custom square styles for selected square and available moves
   const customSquareStyles = useMemo(() => {
@@ -190,6 +204,7 @@ export function ChessBoard({
       targetSquare: string | null;
     }) => {
       if (!targetSquare) return false;
+      if (sourceSquare === targetSquare) return false;
 
       // Mobile haptic feedback without delaying move execution.
       if (isTouchDevice) {
@@ -351,7 +366,7 @@ export function ChessBoard({
       const left = col * squareSize + squareSize * 0.62;
       const top = row * squareSize + squareSize * 0.12;
       return {
-        key: score.move,
+        key: `${score.engine}-${score.move}-${score.quality}`,
         left,
         top,
         color: score.color,

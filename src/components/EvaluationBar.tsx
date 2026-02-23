@@ -7,25 +7,42 @@ import {
 interface EvaluationBarProps {
   evaluation?: number | null;
   mate?: number | null;
+  winChance?: number | null;
+  trend?: number[];
   isThinking?: boolean;
 }
 
 export function EvaluationBar({
   evaluation,
   mate,
+  winChance,
+  trend = [],
   isThinking = false,
 }: EvaluationBarProps) {
-  const hasData = hasEvaluationData(evaluation, mate);
+  const hasData = hasEvaluationData(evaluation, mate, winChance);
   const percentWhite = hasData
-    ? getEvaluationBarPercent(evaluation ?? undefined, mate)
+    ? getEvaluationBarPercent(evaluation ?? undefined, mate, winChance)
     : 50;
-  const wdl = hasData ? estimateWdl(evaluation ?? undefined, mate) : null;
+  const wdl = hasData
+    ? estimateWdl(evaluation ?? undefined, mate, winChance)
+    : null;
   const scoreLabel =
     mate !== null && mate !== undefined
       ? `M${Math.abs(mate)}`
       : evaluation !== null && evaluation !== undefined
         ? `${evaluation > 0 ? "+" : ""}${(evaluation / 100).toFixed(2)}`
         : "--";
+  const trendPoints = trend.slice(-32);
+  const trendPath =
+    trendPoints.length > 1
+      ? trendPoints
+          .map((value, index) => {
+            const x = (index / (trendPoints.length - 1)) * 100;
+            const y = ((100 - value) / 100) * 24;
+            return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+          })
+          .join(" ")
+      : "";
 
   return (
     <div className="w-full md:w-20 flex md:flex-col items-center gap-2">
@@ -51,6 +68,23 @@ export function EvaluationBar({
             <div className="absolute inset-0 bg-blue-300/15 animate-pulse" />
           )}
         </div>
+        {trendPath && (
+          <div className="mt-1 h-6 w-full rounded border border-gray-700 bg-gray-900/70 px-1">
+            <svg
+              viewBox="0 0 100 24"
+              className="h-full w-full"
+              preserveAspectRatio="none"
+            >
+              <path
+                d={trendPath}
+                fill="none"
+                stroke="rgb(74 222 128)"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        )}
       </div>
 
       <div className="hidden md:flex flex-col items-center w-16">
@@ -88,6 +122,23 @@ export function EvaluationBar({
             Menunggu
             <br />
             analisis
+          </div>
+        )}
+        {trendPath && (
+          <div className="mt-2 h-8 w-full rounded border border-gray-700 bg-gray-900/70 px-1">
+            <svg
+              viewBox="0 0 100 24"
+              className="h-full w-full"
+              preserveAspectRatio="none"
+            >
+              <path
+                d={trendPath}
+                fill="none"
+                stroke="rgb(74 222 128)"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+              />
+            </svg>
           </div>
         )}
       </div>

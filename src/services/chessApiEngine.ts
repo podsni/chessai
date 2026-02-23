@@ -1,6 +1,7 @@
 interface ChessApiResponse {
   eval?: number;
   centipawns?: string | number;
+  winChance?: string | number;
   move?: string;
   lan?: string;
   mate?: number | null;
@@ -11,6 +12,7 @@ interface EngineAnalysisResponse {
   success: boolean;
   evaluation?: number;
   mate?: number;
+  winChance?: number;
   bestmove?: string;
   continuation?: string;
 }
@@ -40,6 +42,7 @@ export class ChessApiEngine {
 
       const data = (await response.json()) as ChessApiResponse;
       const centipawns = this.parseCentipawns(data);
+      const winChance = this.parseWinChance(data);
       const bestMove = data.move || data.lan;
 
       if (!bestMove && centipawns === undefined && data.mate == null) {
@@ -50,6 +53,7 @@ export class ChessApiEngine {
         success: true,
         evaluation: centipawns,
         mate: data.mate ?? undefined,
+        winChance,
         bestmove: bestMove,
         continuation: Array.isArray(data.continuationArr)
           ? data.continuationArr.join(" ")
@@ -85,5 +89,16 @@ export class ChessApiEngine {
       return Number.isFinite(parsed) ? Math.round(parsed * 100) : undefined;
     }
     return undefined;
+  }
+
+  private parseWinChance(data: ChessApiResponse): number | undefined {
+    if (data.winChance === undefined || data.winChance === null) {
+      return undefined;
+    }
+    const parsed = Number(data.winChance);
+    if (!Number.isFinite(parsed)) {
+      return undefined;
+    }
+    return Math.max(1, Math.min(99, Math.round(parsed)));
   }
 }
