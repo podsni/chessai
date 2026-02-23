@@ -4,6 +4,13 @@ export interface WdlEstimate {
   loss: number;
 }
 
+export const hasEvaluationData = (
+  evaluation?: number | null,
+  mate?: number | null,
+): boolean =>
+  (evaluation !== null && evaluation !== undefined) ||
+  (mate !== null && mate !== undefined);
+
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value));
 

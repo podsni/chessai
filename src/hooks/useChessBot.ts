@@ -508,8 +508,12 @@ export const useChessBot = (
             move.san,
           );
 
-          // Auto-analyze if enabled
-          if (settings.autoAnalysis || settings.analysisMode) {
+          // Auto-analyze if enabled or watching AI-vs-AI game.
+          if (
+            settings.autoAnalysis ||
+            settings.analysisMode ||
+            settings.mode === "ai-vs-ai"
+          ) {
             setTimeout(() => handleAnalyzePosition(), 100);
           }
           return true;
@@ -651,8 +655,12 @@ export const useChessBot = (
           setMoveHistory(newMoveHistory);
           updateGameState();
 
-          // Update analysis with bot move
-          if (settings.autoAnalysis || settings.analysisMode) {
+          // Update analysis in realtime for AI games or analysis mode.
+          if (
+            settings.autoAnalysis ||
+            settings.analysisMode ||
+            settings.mode === "ai-vs-ai"
+          ) {
             const nextPreferredEngine = getEngineForCurrentTurn();
             const nextAnalysisDepth = Math.min(
               settings.aiDepth,
@@ -1056,18 +1064,25 @@ export const useChessBot = (
     handleBotMove,
   ]);
 
-  // Auto-analyze in analysis mode
+  // Realtime analyze when analysis mode is active, auto-analysis is enabled,
+  // or when watching AI-vs-AI games.
   useEffect(() => {
-    if (settings.analysisMode && settings.autoAnalysis && !isThinking) {
+    if (
+      (settings.analysisMode ||
+        settings.autoAnalysis ||
+        settings.mode === "ai-vs-ai") &&
+      !isThinking
+    ) {
       const timeoutId = setTimeout(() => {
         handleAnalyzePosition();
-      }, 300);
+      }, 240);
 
       return () => clearTimeout(timeoutId);
     }
   }, [
     settings.analysisMode,
     settings.autoAnalysis,
+    settings.mode,
     currentFen,
     isThinking,
     handleAnalyzePosition,

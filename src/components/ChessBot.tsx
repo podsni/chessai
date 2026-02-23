@@ -235,6 +235,12 @@ export function ChessBot({
                   className="flex items-center gap-2 text-xs md:text-sm flex-wrap"
                   style={{ color: "var(--text-light)" }}
                 >
+                  <div className="inline-flex items-center gap-1 rounded-full border border-emerald-700/60 bg-emerald-900/25 px-2 py-1 text-[11px] text-emerald-300">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${isThinking ? "bg-emerald-300 animate-pulse" : "bg-emerald-400"}`}
+                    />
+                    Live Eval
+                  </div>
                   <div className="flex items-center gap-2">
                     <span>Human:</span>
                     <span
@@ -259,7 +265,14 @@ export function ChessBot({
               </div>
 
               <div className="flex flex-col md:flex-row gap-3 md:items-stretch">
-                <div className="order-2 md:order-1 flex-1 min-w-0">
+                <div className="order-1 md:order-1 md:pt-8">
+                  <EvaluationBar
+                    evaluation={analysis?.evaluation}
+                    mate={analysis?.mate}
+                    isThinking={isThinking}
+                  />
+                </div>
+                <div className="order-2 md:order-2 flex-1 min-w-0">
                   <ChessBoard
                     chess={chess}
                     onSquareClick={handleSquareClick}
@@ -274,13 +287,6 @@ export function ChessBot({
                     humanColor={settings.humanColor}
                     aiColor={settings.aiColor}
                     gameMode={settings.mode}
-                  />
-                </div>
-                <div className="order-1 md:order-2 md:pt-8">
-                  <EvaluationBar
-                    evaluation={analysis?.evaluation}
-                    mate={analysis?.mate}
-                    isThinking={isThinking}
                   />
                 </div>
               </div>
