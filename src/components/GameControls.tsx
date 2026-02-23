@@ -96,6 +96,25 @@ export function GameControls({
     return "—";
   };
 
+  const formatEvalSigned = (
+    value?: number | null,
+    mateValue?: number | null,
+  ) => {
+    if (mateValue !== null && mateValue !== undefined) {
+      return mateValue > 0
+        ? `+M${Math.abs(mateValue)}`
+        : `-M${Math.abs(mateValue)}`;
+    }
+    if (value === null || value === undefined) return "—";
+    const cp = value / 100;
+    return `${cp > 0 ? "+" : ""}${cp.toFixed(2)}`;
+  };
+
+  const invertEval = (value?: number | null) =>
+    value === null || value === undefined ? undefined : -value;
+  const invertMate = (mateValue?: number | null) =>
+    mateValue === null || mateValue === undefined ? undefined : -mateValue;
+
   const engineLabels: Record<AIEngine, string> = {
     "stockfish-online": "Stockfish Online",
     "chess-api": "Chess API",
@@ -170,11 +189,76 @@ export function GameControls({
               </span>
             )}
           </div>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+            <div className="rounded border border-gray-700 bg-gray-900/70 px-2 py-1 text-gray-300">
+              <div className="text-gray-400">White</div>
+              <div className="text-white font-semibold">
+                {formatEvalSigned(evaluation, mate)}
+              </div>
+            </div>
+            <div className="rounded border border-gray-700 bg-gray-900/70 px-2 py-1 text-gray-300">
+              <div className="text-gray-400">Black</div>
+              <div className="text-white font-semibold">
+                {formatEvalSigned(invertEval(evaluation), invertMate(mate))}
+              </div>
+            </div>
+          </div>
+          {settings.mode === "human-vs-ai" && (
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded border border-blue-700/40 bg-blue-900/20 px-2 py-1 text-blue-200">
+                <div className="text-blue-300">
+                  Human ({settings.humanColor})
+                </div>
+                <div className="text-white font-semibold">
+                  {settings.humanColor === "white"
+                    ? formatEvalSigned(evaluation, mate)
+                    : formatEvalSigned(
+                        invertEval(evaluation),
+                        invertMate(mate),
+                      )}
+                </div>
+              </div>
+              <div className="rounded border border-emerald-700/40 bg-emerald-900/20 px-2 py-1 text-emerald-200">
+                <div className="text-emerald-300">AI ({settings.aiColor})</div>
+                <div className="text-white font-semibold">
+                  {settings.aiColor === "white"
+                    ? formatEvalSigned(evaluation, mate)
+                    : formatEvalSigned(
+                        invertEval(evaluation),
+                        invertMate(mate),
+                      )}
+                </div>
+              </div>
+            </div>
+          )}
+          {settings.mode === "ai-vs-ai" && (
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded border border-gray-700 bg-gray-900/70 px-2 py-1 text-gray-300">
+                <div className="text-gray-400">
+                  White ({engineLabels[settings.aiEngine]})
+                </div>
+                <div className="text-white font-semibold">
+                  {formatEvalSigned(evaluation, mate)}
+                </div>
+              </div>
+              <div className="rounded border border-gray-700 bg-gray-900/70 px-2 py-1 text-gray-300">
+                <div className="text-gray-400">
+                  Black ({engineLabels[settings.battleOpponentEngine]})
+                </div>
+                <div className="text-white font-semibold">
+                  {formatEvalSigned(invertEval(evaluation), invertMate(mate))}
+                </div>
+              </div>
+            </div>
+          )}
           {
             <div className="mt-1 text-xs text-gray-300">
               Analyze Mode:{" "}
               <span className="text-white font-medium">
                 {analysisModeLabels[settings.analysisEngineMode]}
+              </span>
+              <span className="ml-2 text-emerald-300">
+                • Eval realtime aktif di semua mode
               </span>
             </div>
           }
@@ -183,7 +267,7 @@ export function GameControls({
               {engineNotice}
             </div>
           )}
-          {
+          {(settings.analysisMode || settings.mode === "ai-vs-ai") && (
             <div className="mt-2 text-[11px] text-gray-300 flex flex-wrap gap-3">
               <span className="inline-flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-[#7fb069]" />
@@ -198,7 +282,7 @@ export function GameControls({
                 Same move (consensus)
               </span>
             </div>
-          }
+          )}
         </div>
 
         {/* AI Prediction Mini Board */}

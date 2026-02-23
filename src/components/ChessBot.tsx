@@ -313,7 +313,7 @@ export function ChessBot({
                   </div>
                 </button>
                 <button
-                  onClick={handleAnalyzePosition}
+                  onClick={() => handleAnalyzePosition({ forceArrows: true })}
                   className={`chess-button flex-1 sm:flex-none min-h-[44px] touch-manipulation ${isThinking ? "pulse" : ""}`}
                   disabled={isThinking}
                 >
@@ -451,7 +451,9 @@ export function ChessBot({
               onStartAsBlack={handleStartAsBlack}
               onUndo={handleUndo}
               onFlipBoard={handleFlipBoard}
-              onAnalyzePosition={handleAnalyzePosition}
+              onAnalyzePosition={() =>
+                handleAnalyzePosition({ forceArrows: true })
+              }
               onGetHint={handleGetHint}
               onBotMove={handleBotMove}
               onLoadFen={handleLoadFen}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Chess, Square } from "chess.js";
 import { useQueryClient } from "@tanstack/react-query";
 import { StockfishAPI } from "../services/stockfishApi";
@@ -89,6 +89,12 @@ export const useChessBot = (
   const [isAiVsAiPaused, setIsAiVsAiPaused] = useState(false);
   const [engineNotice, setEngineNotice] = useState<string | null>(null);
   const [engineInsights, setEngineInsights] = useState<EngineInsight[]>([]);
+  const analysisTimeoutRef = useRef<number | null>(null);
+  const analysisInFlightRef = useRef(false);
+  const lastAnalyzedFenRef = useRef<string | null>(null);
+  const shouldRenderArrows =
+    settings.showAnalysisArrows &&
+    (settings.analysisMode || settings.mode === "ai-vs-ai");
   const currentFen = chess.fen();
   const currentPgn = chess.pgn();
 
@@ -178,8 +184,9 @@ export const useChessBot = (
   }, []);
 
   const createAnalysisArrows = useCallback(
-    (bestMove: string | null) => {
-      if (!bestMove || !settings.showAnalysisArrows) {
+    (bestMove: string | null, options?: { force?: boolean }) => {
+      const allowArrows = shouldRenderArrows || options?.force === true;
+      if (!bestMove || !allowArrows) {
         setAnalysisArrows([]);
         return;
       }
@@ -196,7 +203,7 @@ export const useChessBot = (
         setAnalysisArrows(arrows);
       }
     },
-    [settings.showAnalysisArrows, parseMove],
+    [shouldRenderArrows, parseMove],
   );
 
   const getAnalysisCached = useCallback(
@@ -343,127 +350,181 @@ export const useChessBot = (
     [buildPredictionLine],
   );
 
-  const handleAnalyzePosition = useCallback(async () => {
-    setIsThinking(true);
-    try {
-      const analysisDepth = Math.min(
-        settings.aiDepth,
-        getAnalysisDepthLimit(settings),
-      );
-      const engines: AIEngine[] =
-        settings.analysisEngineMode === "single"
-          ? [settings.aiEngine]
-          : ["stockfish-online", "chess-api"];
+  const handleAnalyzePosition = useCallback(
+    async (options?: {
+      force?: boolean;
+      fen?: string;
+      silent?: boolean;
+      forceArrows?: boolean;
+    }) => {
+      const targetFen = options?.fen ?? chess.fen();
+      const shouldForce = options?.force === true;
+      const isSilent = options?.silent === true;
 
-      const results = await Promise.all(
-        engines.map(async (engine) => {
-          const result = await getSafeAnalysis(
-            chess.fen(),
-            analysisDepth,
-            engine,
-          );
-          return {
-            requestedEngine: engine,
-            ...result,
-          };
-        }),
-      );
+      if (analysisInFlightRef.current) return;
+      if (!shouldForce && lastAnalyzedFenRef.current === targetFen) return;
 
-      const preferredResult =
-        results.find((r) => r.requestedEngine === settings.aiEngine) ||
-        results[0];
-      const safeMove = pickSafeMove(results, chess.turn());
-      setAnalysis(preferredResult.analysis);
-
-      if (settings.analysisEngineMode === "single") {
-        setEngineInsights([
-          toEngineInsight(preferredResult.engineUsed, preferredResult.analysis),
-        ]);
-        const singleBest = preferredResult.analysis.bestmove
-          ? engineClients[preferredResult.engineUsed].extractMoveFromString(
-              preferredResult.analysis.bestmove,
-            )
-          : null;
-        setHintMove(singleBest);
-        createAnalysisArrows(singleBest);
-      } else {
-        const insights = results.map(({ requestedEngine, analysis }) =>
-          toEngineInsight(requestedEngine, analysis),
-        );
-        setEngineInsights(insights);
-        setHintMove(safeMove);
-
-        if (!settings.showAnalysisArrows) {
-          setAnalysisArrows([]);
-        } else if (settings.analysisEngineMode === "safe") {
-          const parsedSafe = safeMove ? parseMove(safeMove) : null;
-          setAnalysisArrows(
-            parsedSafe
-              ? [{ from: parsedSafe.from, to: parsedSafe.to, color: "#facc15" }]
-              : [],
-          );
-        } else {
-          const arrowColors: Record<AIEngine, string> = {
-            "stockfish-online": "#7fb069",
-            "chess-api": "#3b82f6",
-          };
-          const parsedArrows = results
-            .map((result) => {
-              const bestMove = engineClients[
-                result.engineUsed
-              ].extractMoveFromString(result.analysis.bestmove || "");
-              const parsed = bestMove ? parseMove(bestMove) : null;
-              if (!parsed) return null;
-              return {
-                from: parsed.from,
-                to: parsed.to,
-                color: arrowColors[result.requestedEngine],
-              } as AnalysisArrow;
-            })
-            .filter((arrow): arrow is AnalysisArrow => Boolean(arrow));
-
-          const arrows =
-            parsedArrows.length >= 2 &&
-            parsedArrows[0].from === parsedArrows[1].from &&
-            parsedArrows[0].to === parsedArrows[1].to
-              ? [{ ...parsedArrows[0], color: "#facc15" }]
-              : parsedArrows;
-          setAnalysisArrows(arrows);
-        }
+      analysisInFlightRef.current = true;
+      if (!isSilent) {
+        setIsThinking(true);
       }
+      try {
+        const analysisDepth = Math.min(
+          settings.aiDepth,
+          getAnalysisDepthLimit(settings),
+        );
+        const engines: AIEngine[] =
+          settings.analysisEngineMode === "single"
+            ? [settings.aiEngine]
+            : ["stockfish-online", "chess-api"];
 
-      const fallbackMessages = results
-        .filter((r) => r.fallbackUsed)
-        .map((r) => `${r.requestedEngine} -> ${r.engineUsed}`);
-      const depthNotice =
-        analysisDepth < settings.aiDepth
-          ? `Depth dibatasi ke ${analysisDepth} sesuai batas engine.`
-          : null;
-      setEngineNotice(
-        [
-          depthNotice,
-          fallbackMessages.length > 0
-            ? `Fallback aktif: ${fallbackMessages.join(", ")}`
-            : null,
-        ]
-          .filter(Boolean)
-          .join(" | ") || null,
-      );
-    } catch (error) {
-      console.error("Error analyzing position:", error);
-      setEngineNotice("Semua engine gagal merespons. Coba lagi sebentar.");
-    } finally {
-      setIsThinking(false);
+        const results = await Promise.all(
+          engines.map(async (engine) => {
+            const result = await getSafeAnalysis(
+              targetFen,
+              analysisDepth,
+              engine,
+            );
+            return {
+              requestedEngine: engine,
+              ...result,
+            };
+          }),
+        );
+
+        const preferredResult =
+          results.find((r) => r.requestedEngine === settings.aiEngine) ||
+          results[0];
+        const safeMove = pickSafeMove(results, chess.turn());
+        const allowArrows = shouldRenderArrows || options?.forceArrows === true;
+        setAnalysis(preferredResult.analysis);
+
+        if (settings.analysisEngineMode === "single") {
+          setEngineInsights([
+            toEngineInsight(
+              preferredResult.engineUsed,
+              preferredResult.analysis,
+            ),
+          ]);
+          const singleBest = preferredResult.analysis.bestmove
+            ? engineClients[preferredResult.engineUsed].extractMoveFromString(
+                preferredResult.analysis.bestmove,
+              )
+            : null;
+          setHintMove(singleBest);
+          createAnalysisArrows(singleBest, { force: allowArrows });
+        } else {
+          const insights = results.map(({ requestedEngine, analysis }) =>
+            toEngineInsight(requestedEngine, analysis),
+          );
+          setEngineInsights(insights);
+          setHintMove(safeMove);
+
+          if (!allowArrows) {
+            setAnalysisArrows([]);
+          } else if (settings.analysisEngineMode === "safe") {
+            const parsedSafe = safeMove ? parseMove(safeMove) : null;
+            setAnalysisArrows(
+              parsedSafe
+                ? [
+                    {
+                      from: parsedSafe.from,
+                      to: parsedSafe.to,
+                      color: "#facc15",
+                    },
+                  ]
+                : [],
+            );
+          } else {
+            const arrowColors: Record<AIEngine, string> = {
+              "stockfish-online": "#7fb069",
+              "chess-api": "#3b82f6",
+            };
+            const parsedArrows = results
+              .map((result) => {
+                const bestMove = engineClients[
+                  result.engineUsed
+                ].extractMoveFromString(result.analysis.bestmove || "");
+                const parsed = bestMove ? parseMove(bestMove) : null;
+                if (!parsed) return null;
+                return {
+                  from: parsed.from,
+                  to: parsed.to,
+                  color: arrowColors[result.requestedEngine],
+                } as AnalysisArrow;
+              })
+              .filter((arrow): arrow is AnalysisArrow => Boolean(arrow));
+
+            const arrows =
+              parsedArrows.length >= 2 &&
+              parsedArrows[0].from === parsedArrows[1].from &&
+              parsedArrows[0].to === parsedArrows[1].to
+                ? [{ ...parsedArrows[0], color: "#facc15" }]
+                : parsedArrows;
+            setAnalysisArrows(arrows);
+          }
+        }
+
+        const fallbackMessages = results
+          .filter((r) => r.fallbackUsed)
+          .map((r) => `${r.requestedEngine} -> ${r.engineUsed}`);
+        const depthNotice =
+          analysisDepth < settings.aiDepth
+            ? `Depth dibatasi ke ${analysisDepth} sesuai batas engine.`
+            : null;
+        setEngineNotice(
+          [
+            depthNotice,
+            fallbackMessages.length > 0
+              ? `Fallback aktif: ${fallbackMessages.join(", ")}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" | ") || null,
+        );
+        lastAnalyzedFenRef.current = targetFen;
+      } catch (error) {
+        console.error("Error analyzing position:", error);
+        setEngineNotice("Semua engine gagal merespons. Coba lagi sebentar.");
+      } finally {
+        if (!isSilent) {
+          setIsThinking(false);
+        }
+        analysisInFlightRef.current = false;
+      }
+    },
+    [
+      chess,
+      settings,
+      shouldRenderArrows,
+      createAnalysisArrows,
+      getSafeAnalysis,
+      pickSafeMove,
+      parseMove,
+      toEngineInsight,
+    ],
+  );
+
+  const clearAnalysisSchedule = useCallback(() => {
+    if (analysisTimeoutRef.current) {
+      window.clearTimeout(analysisTimeoutRef.current);
+      analysisTimeoutRef.current = null;
     }
-  }, [
-    chess,
-    settings,
-    createAnalysisArrows,
-    getSafeAnalysis,
-    pickSafeMove,
-    parseMove,
-    toEngineInsight,
-  ]);
+  }, []);
+
+  const scheduleAnalysis = useCallback(
+    (delay = 140, options?: { force?: boolean; silent?: boolean }) => {
+      clearAnalysisSchedule();
+      analysisTimeoutRef.current = window.setTimeout(() => {
+        analysisTimeoutRef.current = null;
+        void handleAnalyzePosition({
+          force: options?.force,
+          silent: options?.silent,
+        });
+      }, delay);
+    },
+    [clearAnalysisSchedule, handleAnalyzePosition],
+  );
 
   const makeMove = useCallback(
     (from: Square, to: Square) => {
@@ -479,6 +540,7 @@ export const useChessBot = (
           setMoveHistory(newMoveHistory);
           updateGameState();
           setHintMove(null); // Clear hint after move
+          setAnalysisArrows([]);
 
           // Enhanced feedback for moves
           if (move.captured) {
@@ -508,14 +570,6 @@ export const useChessBot = (
             move.san,
           );
 
-          // Auto-analyze if enabled or watching AI-vs-AI game.
-          if (
-            settings.autoAnalysis ||
-            settings.analysisMode ||
-            settings.mode === "ai-vs-ai"
-          ) {
-            setTimeout(() => handleAnalyzePosition(), 100);
-          }
           return true;
         }
       } catch (error) {
@@ -526,7 +580,7 @@ export const useChessBot = (
 
       return false;
     },
-    [chess, moveHistory, settings, updateGameState, handleAnalyzePosition],
+    [chess, moveHistory, updateGameState],
   );
 
   const handleSquareClick = useCallback(
@@ -654,29 +708,6 @@ export const useChessBot = (
           const newMoveHistory = [...moveHistory, move.san];
           setMoveHistory(newMoveHistory);
           updateGameState();
-
-          // Update analysis in realtime for AI games or analysis mode.
-          if (
-            settings.autoAnalysis ||
-            settings.analysisMode ||
-            settings.mode === "ai-vs-ai"
-          ) {
-            const nextPreferredEngine = getEngineForCurrentTurn();
-            const nextAnalysisDepth = Math.min(
-              settings.aiDepth,
-              getAnalysisDepthLimit(settings),
-            );
-            const nextAnalysis = await getSafeAnalysis(
-              chess.fen(),
-              nextAnalysisDepth,
-              nextPreferredEngine,
-            );
-            setAnalysis(nextAnalysis.analysis);
-            createAnalysisArrows(nextAnalysis.analysis?.bestmove || null);
-            setEngineInsights([
-              toEngineInsight(nextAnalysis.engineUsed, nextAnalysis.analysis),
-            ]);
-          }
         }
       }
     } catch (error) {
@@ -690,7 +721,6 @@ export const useChessBot = (
     moveHistory,
     settings,
     updateGameState,
-    createAnalysisArrows,
     getSafeAnalysis,
     getEngineForCurrentTurn,
     toEngineInsight,
@@ -722,6 +752,7 @@ export const useChessBot = (
         results.find((r) => r.requestedEngine === settings.aiEngine) ||
         results[0];
       const safeMove = pickSafeMove(results, chess.turn());
+      const allowArrows = shouldRenderArrows || settings.showAnalysisArrows;
       setAnalysis(preferredResult.analysis);
 
       if (settings.analysisEngineMode === "single") {
@@ -731,7 +762,7 @@ export const useChessBot = (
             )
           : null;
         setHintMove(cleanMove);
-        createAnalysisArrows(cleanMove);
+        createAnalysisArrows(cleanMove, { force: allowArrows });
         setEngineInsights([
           toEngineInsight(preferredResult.engineUsed, preferredResult.analysis),
         ]);
@@ -743,7 +774,7 @@ export const useChessBot = (
           ),
         );
 
-        if (!settings.showAnalysisArrows) {
+        if (!allowArrows) {
           setAnalysisArrows([]);
         } else if (settings.analysisEngineMode === "safe") {
           const parsedSafe = safeMove ? parseMove(safeMove) : null;
@@ -807,6 +838,7 @@ export const useChessBot = (
   }, [
     chess,
     settings,
+    shouldRenderArrows,
     createAnalysisArrows,
     getSafeAnalysis,
     parseMove,
@@ -922,12 +954,19 @@ export const useChessBot = (
         setAnalysisArrows([]);
       }
 
-      // Auto-analyze if analysis mode is enabled
-      if (newSettings.analysisMode === true && !isThinking) {
-        setTimeout(() => handleAnalyzePosition(), 100);
+      const shouldForceReanalyze =
+        newSettings.analysisMode === true ||
+        newSettings.aiDepth !== undefined ||
+        newSettings.aiEngine !== undefined ||
+        newSettings.analysisEngineMode !== undefined ||
+        newSettings.battleEnabled !== undefined ||
+        newSettings.battleOpponentEngine !== undefined;
+
+      if (shouldForceReanalyze && !chess.isGameOver()) {
+        scheduleAnalysis(80, { force: true, silent: true });
       }
     },
-    [isThinking, handleAnalyzePosition],
+    [scheduleAnalysis, chess],
   );
 
   const handlePauseAiVsAi = useCallback(() => {
@@ -978,11 +1017,6 @@ export const useChessBot = (
         clearSelection();
         updateGameState();
 
-        // Auto-analyze the loaded position if analysis mode is on
-        if (settings.autoAnalysis || settings.analysisMode) {
-          setTimeout(() => handleAnalyzePosition(), 100);
-        }
-
         // Play a success sound
         soundManager.playMove();
         hapticManager.successPattern();
@@ -992,14 +1026,7 @@ export const useChessBot = (
         hapticManager.errorPattern();
       }
     },
-    [
-      chess,
-      clearSelection,
-      updateGameState,
-      settings.autoAnalysis,
-      settings.analysisMode,
-      handleAnalyzePosition,
-    ],
+    [chess, clearSelection, updateGameState],
   );
 
   // AI vs AI game loop
@@ -1064,29 +1091,39 @@ export const useChessBot = (
     handleBotMove,
   ]);
 
-  // Realtime analyze when analysis mode is active, auto-analysis is enabled,
-  // or when watching AI-vs-AI games.
   useEffect(() => {
-    if (
-      (settings.analysisMode ||
-        settings.autoAnalysis ||
-        settings.mode === "ai-vs-ai") &&
-      !isThinking
-    ) {
-      const timeoutId = setTimeout(() => {
-        handleAnalyzePosition();
-      }, 240);
+    if (!shouldRenderArrows) {
+      setAnalysisArrows([]);
+    }
+  }, [shouldRenderArrows]);
 
-      return () => clearTimeout(timeoutId);
+  // Keep evaluation bar alive in every mode with silent background analysis.
+  useEffect(() => {
+    if (!chess.isGameOver()) {
+      const delay = settings.analysisMode
+        ? 160
+        : settings.mode === "ai-vs-ai"
+          ? 120
+          : 220;
+      scheduleAnalysis(delay, { silent: true });
+    } else {
+      clearAnalysisSchedule();
     }
   }, [
+    chess,
     settings.analysisMode,
-    settings.autoAnalysis,
     settings.mode,
     currentFen,
-    isThinking,
-    handleAnalyzePosition,
+    scheduleAnalysis,
+    clearAnalysisSchedule,
   ]);
+
+  useEffect(
+    () => () => {
+      clearAnalysisSchedule();
+    },
+    [clearAnalysisSchedule],
+  );
 
   return {
     chess,
