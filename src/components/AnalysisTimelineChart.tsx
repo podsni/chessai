@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import type {
   AnalysisTimelinePoint,
   LiveAnalysisPoint,
@@ -7,6 +8,10 @@ import type {
 interface AnalysisTimelineChartProps {
   timeline: AnalysisTimelinePoint[];
   liveSeries: LiveAnalysisPoint[];
+  mode: "human-vs-ai" | "ai-vs-ai" | "human-vs-human";
+  gameStatus: string;
+  gameOver: boolean;
+  pgnResult?: string | null;
 }
 
 const qualityColor: Record<MoveQualityClass, string> = {
@@ -28,6 +33,26 @@ const qualityLabel: Record<MoveQualityClass, string> = {
   mistake: "Mistake",
   blunder: "Blunder",
 };
+
+const qualityWeight: Record<MoveQualityClass, number> = {
+  brilliant: 100,
+  great: 95,
+  best: 90,
+  good: 80,
+  inaccuracy: 65,
+  mistake: 40,
+  blunder: 15,
+};
+
+const orderedQualities: MoveQualityClass[] = [
+  "brilliant",
+  "great",
+  "best",
+  "good",
+  "inaccuracy",
+  "mistake",
+  "blunder",
+];
 
 const toChartY = (cp: number) => {
   const clamped = Math.max(-1200, Math.min(1200, cp));
@@ -52,11 +77,99 @@ const buildPath = (
 export function AnalysisTimelineChart({
   timeline,
   liveSeries,
+  mode,
+  gameStatus,
+  gameOver,
+  pgnResult,
 }: AnalysisTimelineChartProps) {
   const timelinePoints = timeline.slice(-80);
   const timelineIndex = timelinePoints.map((_, index) => index);
   const livePoints = liveSeries.slice(-40);
   const liveIndex = livePoints.map((_, index) => index);
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+
+  useEffect(() => {
+    if (timelinePoints.length === 0) {
+      setSelectedIndex(-1);
+      return;
+    }
+    setSelectedIndex((prev) =>
+      prev < 0 || prev >= timelinePoints.length
+        ? timelinePoints.length - 1
+        : prev,
+    );
+  }, [timelinePoints.length]);
+
+  const selectedPoint =
+    selectedIndex >= 0 && selectedIndex < timelinePoints.length
+      ? timelinePoints[selectedIndex]
+      : null;
+
+  const qualityCounts = useMemo(() => {
+    const init = () =>
+      Object.fromEntries(
+        orderedQualities.map((quality) => [quality, 0]),
+      ) as Record<MoveQualityClass, number>;
+    const white = init();
+    const black = init();
+
+    for (const point of timelinePoints) {
+      const mover = point.ply % 2 === 1 ? "white" : "black";
+      if (mover === "white") {
+        white[point.quality] += 1;
+      } else {
+        black[point.quality] += 1;
+      }
+    }
+    return { white, black };
+  }, [timelinePoints]);
+
+  const sideAccuracy = useMemo(() => {
+    const compute = (side: "white" | "black") => {
+      const relevant = timelinePoints.filter((point) =>
+        side === "white" ? point.ply % 2 === 1 : point.ply % 2 === 0,
+      );
+      if (relevant.length === 0) return 0;
+      const score =
+        relevant.reduce((sum, point) => sum + qualityWeight[point.quality], 0) /
+        relevant.length;
+      return Math.round(score * 10) / 10;
+    };
+    return {
+      white: compute("white"),
+      black: compute("black"),
+    };
+  }, [timelinePoints]);
+
+  const averageConfidence = useMemo(() => {
+    if (timelinePoints.length === 0) return 0;
+    const total = timelinePoints.reduce(
+      (sum, point) => sum + point.confidence,
+      0,
+    );
+    return Math.round((total / timelinePoints.length) * 10) / 10;
+  }, [timelinePoints]);
+
+  const finalPoint = timelinePoints[timelinePoints.length - 1];
+  const predictedWinner = useMemo(() => {
+    if (!finalPoint) return "Balanced";
+    if (finalPoint.consensusCp > 35) return "White advantage";
+    if (finalPoint.consensusCp < -35) return "Black advantage";
+    return "Balanced";
+  }, [finalPoint]);
+
+  const finalResult = useMemo(() => {
+    if (gameOver) {
+      if (gameStatus.toLowerCase().includes("draw")) return "Draw";
+      if (gameStatus.toLowerCase().includes("white")) return "White won";
+      if (gameStatus.toLowerCase().includes("black")) return "Black won";
+      return gameStatus;
+    }
+    if (pgnResult === "1-0") return "White won (PGN)";
+    if (pgnResult === "0-1") return "Black won (PGN)";
+    if (pgnResult === "1/2-1/2") return "Draw (PGN)";
+    return "Game in progress";
+  }, [gameOver, gameStatus, pgnResult]);
 
   const sfPath = buildPath(timelineIndex, (index) => {
     const cp = timelinePoints[index]?.stockfishCp;
@@ -85,19 +198,37 @@ export function AnalysisTimelineChart({
     (index) => 100 - (livePoints[index]?.consensus ?? 50),
   );
 
+  const selectedX =
+    selectedIndex >= 0 && timelinePoints.length > 1
+      ? (selectedIndex / (timelinePoints.length - 1)) * 100
+      : null;
+  const selectedY = selectedPoint ? toChartY(selectedPoint.consensusCp) : null;
+
   return (
     <div className="mt-4 space-y-3 rounded-lg border border-gray-700 bg-gray-900/70 p-3">
-      <div className="flex items-center justify-between text-xs text-gray-300">
-        <div className="font-semibold text-white">Analysis Timeline</div>
-        <div className="text-[11px] text-gray-400">
-          Move quality + dual engine + consensus
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-300">
+        <div>
+          <div className="font-semibold text-white">Analysis Timeline</div>
+          <div className="text-[11px] text-gray-400">
+            Dual engine, consensus, quality markers
+          </div>
+        </div>
+        <div className="rounded-md border border-gray-700 bg-gray-800/60 px-2 py-1 text-[11px] text-gray-200">
+          Avg Confidence:{" "}
+          <span className="font-semibold text-white">{averageConfidence}%</span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <div className="rounded-md border border-gray-700 bg-black/30 p-2">
-          <div className="mb-1 text-[11px] text-gray-300">
-            Per-Move Timeline
+          <div className="mb-1 flex items-center justify-between text-[11px] text-gray-300">
+            <span>Per-Move Timeline</span>
+            {selectedPoint && (
+              <span className="text-gray-400">
+                Move {selectedPoint.moveNumber} •{" "}
+                {qualityLabel[selectedPoint.quality]}
+              </span>
+            )}
           </div>
           <svg
             viewBox="0 0 100 100"
@@ -111,6 +242,22 @@ export function AnalysisTimelineChart({
               y2="50"
               stroke="#334155"
               strokeWidth="0.8"
+            />
+            <line
+              x1="0"
+              y1="20"
+              x2="100"
+              y2="20"
+              stroke="#1e293b"
+              strokeWidth="0.5"
+            />
+            <line
+              x1="0"
+              y1="80"
+              x2="100"
+              y2="80"
+              stroke="#1e293b"
+              strokeWidth="0.5"
             />
             {sfPath && (
               <path d={sfPath} fill="none" stroke="#3b82f6" strokeWidth="1.4" />
@@ -131,6 +278,17 @@ export function AnalysisTimelineChart({
                 strokeWidth="1.8"
               />
             )}
+            {selectedX !== null && (
+              <line
+                x1={selectedX}
+                y1="0"
+                x2={selectedX}
+                y2="100"
+                stroke="#f8fafc"
+                strokeOpacity="0.35"
+                strokeWidth="0.7"
+              />
+            )}
             {timelinePoints.map((point, index) => {
               const x =
                 timelinePoints.length > 1
@@ -142,7 +300,7 @@ export function AnalysisTimelineChart({
                   key={`${point.fen}-${index}`}
                   cx={x}
                   cy={y}
-                  r="1.4"
+                  r={index === selectedIndex ? "2.2" : "1.4"}
                   fill={qualityColor[point.quality]}
                 >
                   <title>
@@ -151,7 +309,50 @@ export function AnalysisTimelineChart({
                 </circle>
               );
             })}
+            {selectedX !== null && selectedY !== null && (
+              <circle cx={selectedX} cy={selectedY} r="2.6" fill="#f8fafc" />
+            )}
           </svg>
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            <button
+              className="rounded border border-gray-600 bg-gray-800 px-2 py-1 text-[11px] text-gray-200 hover:bg-gray-700 disabled:opacity-40"
+              onClick={() => setSelectedIndex(0)}
+              disabled={timelinePoints.length === 0 || selectedIndex <= 0}
+            >
+              {"|<"}
+            </button>
+            <button
+              className="rounded border border-gray-600 bg-gray-800 px-2 py-1 text-[11px] text-gray-200 hover:bg-gray-700 disabled:opacity-40"
+              onClick={() => setSelectedIndex((prev) => Math.max(0, prev - 1))}
+              disabled={timelinePoints.length === 0 || selectedIndex <= 0}
+            >
+              {"<"}
+            </button>
+            <button
+              className="rounded border border-gray-600 bg-gray-800 px-2 py-1 text-[11px] text-gray-200 hover:bg-gray-700 disabled:opacity-40"
+              onClick={() =>
+                setSelectedIndex((prev) =>
+                  Math.min(timelinePoints.length - 1, prev + 1),
+                )
+              }
+              disabled={
+                timelinePoints.length === 0 ||
+                selectedIndex >= timelinePoints.length - 1
+              }
+            >
+              {">"}
+            </button>
+            <button
+              className="rounded border border-gray-600 bg-gray-800 px-2 py-1 text-[11px] text-gray-200 hover:bg-gray-700 disabled:opacity-40"
+              onClick={() => setSelectedIndex(timelinePoints.length - 1)}
+              disabled={
+                timelinePoints.length === 0 ||
+                selectedIndex >= timelinePoints.length - 1
+              }
+            >
+              {">|"}
+            </button>
+          </div>
         </div>
 
         <div className="rounded-md border border-gray-700 bg-black/30 p-2">
@@ -196,6 +397,97 @@ export function AnalysisTimelineChart({
               />
             )}
           </svg>
+          {selectedPoint && (
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded border border-gray-700 bg-gray-800/60 px-2 py-1 text-gray-300">
+                <div className="text-gray-400">Consensus</div>
+                <div className="font-semibold text-white">
+                  {(selectedPoint.consensusCp / 100).toFixed(2)}
+                </div>
+              </div>
+              <div className="rounded border border-gray-700 bg-gray-800/60 px-2 py-1 text-gray-300">
+                <div className="text-gray-400">Engine Delta</div>
+                <div className="font-semibold text-white">
+                  {selectedPoint.deltaCp} cp
+                </div>
+              </div>
+              <div className="rounded border border-gray-700 bg-gray-800/60 px-2 py-1 text-gray-300">
+                <div className="text-gray-400">WDL</div>
+                <div className="font-semibold text-white">
+                  {selectedPoint.wdlWin}/{selectedPoint.wdlDraw}/
+                  {selectedPoint.wdlLoss}
+                </div>
+              </div>
+              <div className="rounded border border-gray-700 bg-gray-800/60 px-2 py-1 text-gray-300">
+                <div className="text-gray-400">Confidence</div>
+                <div className="font-semibold text-white">
+                  {selectedPoint.confidence}%
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="rounded-md border border-gray-700 bg-black/30 p-2">
+          <div className="mb-2 text-[11px] text-gray-300">Accuracy</div>
+          <div className="grid grid-cols-2 gap-2 text-center">
+            <div className="rounded border border-gray-700 bg-gray-800/60 p-2">
+              <div className="text-xl font-bold text-white">
+                {sideAccuracy.white}
+              </div>
+              <div className="text-[11px] text-gray-400">White Accuracy</div>
+            </div>
+            <div className="rounded border border-gray-700 bg-gray-800/60 p-2">
+              <div className="text-xl font-bold text-white">
+                {sideAccuracy.black}
+              </div>
+              <div className="text-[11px] text-gray-400">Black Accuracy</div>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-md border border-gray-700 bg-black/30 p-2">
+          <div className="mb-2 text-[11px] text-gray-300">
+            Move Quality Breakdown
+          </div>
+          <div className="space-y-1 text-[11px]">
+            {orderedQualities.map((quality) => (
+              <div
+                key={quality}
+                className="grid grid-cols-[1fr_auto_auto] items-center gap-2"
+              >
+                <span style={{ color: qualityColor[quality] }}>
+                  {qualityLabel[quality]}
+                </span>
+                <span className="rounded bg-gray-800/70 px-1.5 py-0.5 text-gray-200">
+                  W {qualityCounts.white[quality]}
+                </span>
+                <span className="rounded bg-gray-800/70 px-1.5 py-0.5 text-gray-200">
+                  B {qualityCounts.black[quality]}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="rounded-md border border-gray-700 bg-black/30 px-3 py-2 text-[11px]">
+          <div className="text-gray-400">Mode</div>
+          <div className="font-semibold text-white capitalize">
+            {mode.replace(/-/g, " ")}
+          </div>
+        </div>
+        <div className="rounded-md border border-gray-700 bg-black/30 px-3 py-2 text-[11px]">
+          <div className="text-gray-400">Predicted Outcome</div>
+          <div className="font-semibold text-emerald-300">
+            {predictedWinner}
+          </div>
+        </div>
+        <div className="rounded-md border border-gray-700 bg-black/30 px-3 py-2 text-[11px]">
+          <div className="text-gray-400">Final Result</div>
+          <div className="font-semibold text-yellow-300">{finalResult}</div>
         </div>
       </div>
 

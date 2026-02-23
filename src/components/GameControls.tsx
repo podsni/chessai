@@ -723,7 +723,7 @@ export function GameControls({
                 className="text-sm"
                 style={{ color: "var(--text-light)" }}
               >
-                Auto Analysis After Each Move
+                Auto Analysis (All Modes)
               </label>
             </div>
 

@@ -121,13 +121,23 @@ export const useChessBot = (
   const [liveAnalysisSeries, setLiveAnalysisSeries] = useState<
     LiveAnalysisPoint[]
   >([]);
+  const [loadedPgnResult, setLoadedPgnResult] = useState<string | null>(null);
   const analysisTimeoutRef = useRef<number | null>(null);
   const analysisInFlightRef = useRef(false);
   const lastAnalyzedFenRef = useRef<string | null>(null);
   const lastTrendFenRef = useRef<string | null>(null);
+  const pgnAnalyzeRunIdRef = useRef(0);
+  const pendingForcedAnalyzeRef = useRef<{
+    force?: boolean;
+    fen?: string;
+    silent?: boolean;
+    forceArrows?: boolean;
+  } | null>(null);
   const shouldRenderArrows =
     settings.showAnalysisArrows &&
-    (settings.analysisMode || settings.mode === "ai-vs-ai");
+    (settings.analysisMode ||
+      settings.mode === "ai-vs-ai" ||
+      settings.autoAnalysis);
   const currentFen = chess.fen();
   const currentPgn = chess.pgn();
 
@@ -168,6 +178,10 @@ export const useChessBot = (
   const clearSelection = useCallback(() => {
     setSelectedSquare(null);
     setAvailableMoves([]);
+  }, []);
+
+  const cancelPgnAnalysis = useCallback(() => {
+    pgnAnalyzeRunIdRef.current = Date.now();
   }, []);
 
   const getGameStatus = useCallback(() => {
@@ -336,6 +350,14 @@ export const useChessBot = (
       });
 
       setLiveAnalysisSeries((prev) => {
+        const lastPoint = analysisTimeline[analysisTimeline.length - 1];
+        const mover: "w" | "b" = chess.turn() === "w" ? "b" : "w";
+        const swingForMoverCp = !lastPoint
+          ? 0
+          : mover === "w"
+            ? consensusCp - lastPoint.consensusCp
+            : lastPoint.consensusCp - consensusCp;
+        const quality = classifyMoveQuality(swingForMoverCp);
         return [
           ...prev.slice(-79),
           {
@@ -343,12 +365,12 @@ export const useChessBot = (
             consensus: consensusPercent,
             stockfish: stockfishPercent,
             chessApi: chessApiPercent,
-            quality: "good",
+            quality,
           },
         ];
       });
     },
-    [chess, classifyMoveQuality, moveHistory.length],
+    [analysisTimeline, chess, classifyMoveQuality, moveHistory.length],
   );
 
   const createAnalysisArrows = useCallback(
@@ -430,6 +452,161 @@ export const useChessBot = (
       }
     },
     [getAnalysisCached, getFallbackEngine],
+  );
+
+  const analyzeLoadedPgnTimeline = useCallback(
+    async (moves: string[]) => {
+      const runId = Date.now();
+      pgnAnalyzeRunIdRef.current = runId;
+      const board = new Chess();
+      const snapshots: Array<{ fen: string; ply: number; moveNumber: number }> =
+        [];
+
+      for (let index = 0; index < moves.length; index += 1) {
+        try {
+          board.move(moves[index]);
+          snapshots.push({
+            fen: board.fen(),
+            ply: index + 1,
+            moveNumber: Math.ceil((index + 1) / 2),
+          });
+        } catch {
+          break;
+        }
+      }
+
+      if (snapshots.length === 0) {
+        return;
+      }
+
+      const limited = snapshots.slice(-120);
+      const analysisDepth = Math.min(
+        6,
+        settings.aiDepth,
+        getAnalysisDepthLimit(settings),
+      );
+      const engines: AIEngine[] =
+        settings.analysisEngineMode === "single"
+          ? [settings.aiEngine]
+          : ["stockfish-online", "chess-api"];
+
+      const timeline: AnalysisTimelinePoint[] = [];
+      const live: LiveAnalysisPoint[] = [];
+      let previousConsensus = 0;
+
+      for (const snapshot of limited) {
+        if (pgnAnalyzeRunIdRef.current !== runId) {
+          return;
+        }
+        const results: AnalysisFetchResult[] = await Promise.all(
+          engines.map(async (engine) => {
+            const result = await getSafeAnalysis(
+              snapshot.fen,
+              analysisDepth,
+              engine,
+            );
+            return {
+              requestedEngine: engine,
+              ...result,
+            };
+          }),
+        );
+
+        const byEngine = new Map<AIEngine, StockfishResponse>();
+        for (const result of results) {
+          byEngine.set(result.requestedEngine, result.analysis);
+        }
+
+        const toCp = (analysisData?: StockfishResponse): number | undefined => {
+          if (!analysisData) return undefined;
+          if (analysisData.mate !== null && analysisData.mate !== undefined) {
+            return analysisData.mate > 0 ? 3200 : -3200;
+          }
+          return analysisData.evaluation;
+        };
+
+        const stockfishCp = toCp(byEngine.get("stockfish-online"));
+        const chessApiCp = toCp(byEngine.get("chess-api"));
+        const consensusCp =
+          stockfishCp !== undefined && chessApiCp !== undefined
+            ? Math.round((stockfishCp + chessApiCp) / 2)
+            : (stockfishCp ?? chessApiCp ?? 0);
+        const deltaCp =
+          stockfishCp !== undefined && chessApiCp !== undefined
+            ? Math.abs(stockfishCp - chessApiCp)
+            : 0;
+        const confidence =
+          stockfishCp !== undefined && chessApiCp !== undefined
+            ? Math.max(25, Math.min(100, Math.round(100 - deltaCp / 6)))
+            : results.some((result) => result.localFallbackUsed)
+              ? 45
+              : 68;
+        const swingForMoverCp =
+          snapshot.ply === 1
+            ? 0
+            : snapshot.ply % 2 === 1
+              ? consensusCp - previousConsensus
+              : previousConsensus - consensusCp;
+        previousConsensus = consensusCp;
+        const quality = classifyMoveQuality(swingForMoverCp);
+        const wdl = estimateWdl(
+          consensusCp,
+          undefined,
+          cpToWinChance(consensusCp),
+        );
+
+        timeline.push({
+          fen: snapshot.fen,
+          ply: snapshot.ply,
+          moveNumber: snapshot.moveNumber,
+          consensusCp,
+          stockfishCp,
+          chessApiCp,
+          deltaCp,
+          confidence,
+          wdlWin: wdl.win,
+          wdlDraw: wdl.draw,
+          wdlLoss: wdl.loss,
+          quality,
+        });
+
+        live.push({
+          timestamp: Date.now() + snapshot.ply,
+          consensus: getEvaluationBarPercent(
+            consensusCp,
+            undefined,
+            cpToWinChance(consensusCp),
+          ),
+          stockfish:
+            stockfishCp !== undefined
+              ? getEvaluationBarPercent(
+                  stockfishCp,
+                  undefined,
+                  cpToWinChance(stockfishCp),
+                )
+              : undefined,
+          chessApi:
+            chessApiCp !== undefined
+              ? getEvaluationBarPercent(
+                  chessApiCp,
+                  undefined,
+                  cpToWinChance(chessApiCp),
+                )
+              : undefined,
+          quality,
+        });
+      }
+
+      if (pgnAnalyzeRunIdRef.current !== runId) {
+        return;
+      }
+      setAnalysisTimeline(timeline);
+      setLiveAnalysisSeries(live.slice(-80));
+      setEngineNotice(
+        `PGN dianalisis: ${timeline.length} posisi (depth ${analysisDepth}).`,
+      );
+    },
+    [classifyMoveQuality, getSafeAnalysis, settings],
   );
 
   const extractUciMoves = useCallback((text?: string): string[] => {
@@ -680,10 +857,28 @@ export const useChessBot = (
       forceArrows?: boolean;
     }) => {
       const targetFen = options?.fen ?? chess.fen();
-      const shouldForce = options?.force === true;
+      const shouldForce =
+        options?.force === true || options?.forceArrows === true;
       const isSilent = options?.silent === true;
 
-      if (analysisInFlightRef.current) return;
+      if (analysisInFlightRef.current) {
+        if (shouldForce) {
+          pendingForcedAnalyzeRef.current = {
+            force: true,
+            forceArrows: options?.forceArrows ?? false,
+            fen: targetFen,
+            silent: isSilent,
+          };
+          window.setTimeout(() => {
+            if (pendingForcedAnalyzeRef.current) {
+              const queued = pendingForcedAnalyzeRef.current;
+              pendingForcedAnalyzeRef.current = null;
+              void handleAnalyzePosition(queued);
+            }
+          }, 120);
+        }
+        return;
+      }
       if (!shouldForce && lastAnalyzedFenRef.current === targetFen) return;
 
       analysisInFlightRef.current = true;
@@ -1399,6 +1594,7 @@ export const useChessBot = (
   ]);
 
   const handleNewGame = useCallback(() => {
+    cancelPgnAnalysis();
     chess.reset();
     setMoveHistory([]);
     setAnalysis(null);
@@ -1409,12 +1605,14 @@ export const useChessBot = (
     setWdlArrowScores([]);
     setAnalysisTimeline([]);
     setLiveAnalysisSeries([]);
+    setLoadedPgnResult(null);
     setHintMove(null);
     clearSelection();
     updateGameState();
-  }, [chess, clearSelection, updateGameState]);
+  }, [cancelPgnAnalysis, chess, clearSelection, updateGameState]);
 
   const handleStartAsWhite = useCallback(() => {
+    cancelPgnAnalysis();
     chess.reset();
     setMoveHistory([]);
     setAnalysis(null);
@@ -1425,6 +1623,7 @@ export const useChessBot = (
     setWdlArrowScores([]);
     setAnalysisTimeline([]);
     setLiveAnalysisSeries([]);
+    setLoadedPgnResult(null);
     setHintMove(null);
     clearSelection();
     setSettings((prev) => ({
@@ -1434,9 +1633,10 @@ export const useChessBot = (
       boardOrientation: "white", // Set board orientation to match human color
     }));
     updateGameState();
-  }, [chess, clearSelection, updateGameState]);
+  }, [cancelPgnAnalysis, chess, clearSelection, updateGameState]);
 
   const handleStartAsBlack = useCallback(() => {
+    cancelPgnAnalysis();
     chess.reset();
     setMoveHistory([]);
     setAnalysis(null);
@@ -1447,6 +1647,7 @@ export const useChessBot = (
     setWdlArrowScores([]);
     setAnalysisTimeline([]);
     setLiveAnalysisSeries([]);
+    setLoadedPgnResult(null);
     setHintMove(null);
     clearSelection();
     setSettings((prev) => ({
@@ -1461,9 +1662,17 @@ export const useChessBot = (
     if (settings.mode === "human-vs-ai") {
       setTimeout(() => handleBotMove(), 500);
     }
-  }, [chess, clearSelection, updateGameState, settings.mode, handleBotMove]);
+  }, [
+    cancelPgnAnalysis,
+    chess,
+    clearSelection,
+    updateGameState,
+    settings.mode,
+    handleBotMove,
+  ]);
 
   const handleUndo = useCallback(() => {
+    cancelPgnAnalysis();
     const move = chess.undo();
     if (move) {
       setMoveHistory((prev) => prev.slice(0, -1));
@@ -1475,15 +1684,17 @@ export const useChessBot = (
       setWdlArrowScores([]);
       setAnalysisTimeline([]);
       setLiveAnalysisSeries([]);
+      setLoadedPgnResult(null);
       setHintMove(null);
       clearSelection();
       updateGameState();
     }
-  }, [chess, clearSelection, updateGameState]);
+  }, [cancelPgnAnalysis, chess, clearSelection, updateGameState]);
 
   const handleLoadFen = useCallback(
     (fen: string) => {
       try {
+        cancelPgnAnalysis();
         chess.load(fen);
         setMoveHistory([]);
         setAnalysis(null);
@@ -1494,6 +1705,7 @@ export const useChessBot = (
         setWdlArrowScores([]);
         setAnalysisTimeline([]);
         setLiveAnalysisSeries([]);
+        setLoadedPgnResult(null);
         setHintMove(null);
         clearSelection();
         updateGameState();
@@ -1501,7 +1713,7 @@ export const useChessBot = (
         console.error("Invalid FEN:", error);
       }
     },
-    [chess, clearSelection, updateGameState],
+    [cancelPgnAnalysis, chess, clearSelection, updateGameState],
   );
 
   const handleFlipBoard = useCallback(() => {
@@ -1570,6 +1782,7 @@ export const useChessBot = (
   const handleLoadPGN = useCallback(
     (newChess: Chess, gameInfo: PGNGameInfo) => {
       try {
+        cancelPgnAnalysis();
         // Load the position from the provided chess instance
         chess.load(newChess.fen());
 
@@ -1600,9 +1813,12 @@ export const useChessBot = (
         setWdlArrowScores([]);
         setAnalysisTimeline([]);
         setLiveAnalysisSeries([]);
+        setLoadedPgnResult(gameInfo.result || null);
         setHintMove(null);
         clearSelection();
         updateGameState();
+        setEngineNotice("Menganalisis PGN yang dimuat...");
+        void analyzeLoadedPgnTimeline(gameInfo.moves);
 
         // Play a success sound
         soundManager.playMove();
@@ -1613,7 +1829,13 @@ export const useChessBot = (
         hapticManager.errorPattern();
       }
     },
-    [chess, clearSelection, updateGameState],
+    [
+      analyzeLoadedPgnTimeline,
+      cancelPgnAnalysis,
+      chess,
+      clearSelection,
+      updateGameState,
+    ],
   );
 
   // AI vs AI game loop
@@ -1700,6 +1922,11 @@ export const useChessBot = (
 
   // Keep evaluation bar alive in every mode with silent background analysis.
   useEffect(() => {
+    if (!settings.autoAnalysis && !settings.analysisMode) {
+      clearAnalysisSchedule();
+      return;
+    }
+
     if (!chess.isGameOver()) {
       const delay = settings.analysisMode
         ? 160
@@ -1713,6 +1940,7 @@ export const useChessBot = (
   }, [
     chess,
     settings.analysisMode,
+    settings.autoAnalysis,
     settings.mode,
     currentFen,
     scheduleAnalysis,
@@ -1742,6 +1970,7 @@ export const useChessBot = (
     evaluationTrend,
     analysisTimeline,
     liveAnalysisSeries,
+    loadedPgnResult,
     hintMove,
     isAiVsAiPaused,
     engineNotice,

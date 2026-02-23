@@ -81,6 +81,7 @@ export function ChessBot({
     evaluationTrend,
     analysisTimeline,
     liveAnalysisSeries,
+    loadedPgnResult,
     moveHistory,
     analysisArrows,
     hintMove,
@@ -493,6 +494,10 @@ export function ChessBot({
               <AnalysisTimelineChart
                 timeline={analysisTimeline}
                 liveSeries={liveAnalysisSeries}
+                mode={settings.mode}
+                gameStatus={gameStatus}
+                gameOver={chess.isGameOver()}
+                pgnResult={loadedPgnResult}
               />
 
               {/* Analysis Display */}
