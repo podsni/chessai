@@ -7,6 +7,7 @@ import {
   getAnalysisDepthLimit,
   getUiDepthLimit,
 } from "../utils/engineConstraints";
+import { estimateWdl } from "../utils/evaluation";
 import type {
   AIEngine,
   AnalysisEngineMode,
@@ -107,6 +108,7 @@ export function GameControls({
   const uiDepthLimit = getUiDepthLimit(settings);
   const aiMoveDepthLimit = getAiMoveDepthLimit(settings);
   const analysisDepthLimit = getAnalysisDepthLimit(settings);
+  const wdl = estimateWdl(evaluation ?? undefined, mate);
 
   const buildPredictionSteps = (fen: string, moves: string[], maxSteps = 4) => {
     const board = new Chess(fen);
@@ -663,6 +665,13 @@ export function GameControls({
                   <span className="font-mono text-yellow-400 bg-gray-700 px-2 py-1 rounded">
                     {hintMove}
                   </span>
+                </div>
+              )}
+              {!isThinking && (
+                <div className="text-xs text-gray-300 mt-2">
+                  WDL: <span className="text-white">W {wdl.win}%</span> •{" "}
+                  <span className="text-white">D {wdl.draw}%</span> •{" "}
+                  <span className="text-white">L {wdl.loss}%</span>
                 </div>
               )}
             </div>

@@ -4,6 +4,7 @@ import { SettingsModal } from "./SettingsModal";
 import { FenDisplay } from "./FenDisplay";
 import { MoveNotation } from "./MoveNotation";
 import { PgnLoadModal } from "./PgnLoadModal";
+import { EvaluationBar } from "./EvaluationBar";
 import { useChessBot } from "../hooks/useChessBot";
 import { useState, useEffect } from "react";
 import {
@@ -20,6 +21,7 @@ import {
   Target,
 } from "lucide-react";
 import type { PersistedGameState } from "../types/chess";
+import { estimateWdl } from "../utils/evaluation";
 
 interface ChessBotProps {
   tabId?: string;
@@ -94,6 +96,7 @@ export function ChessBot({
     settings.mode === "human-vs-human" ||
     (settings.mode === "human-vs-ai" &&
       chess.turn() === settings.humanColor[0]);
+  const wdl = estimateWdl(analysis?.evaluation, analysis?.mate);
 
   return (
     <div className="page-shell min-h-screen">
@@ -255,21 +258,32 @@ export function ChessBot({
                 </div>
               </div>
 
-              <ChessBoard
-                chess={chess}
-                onSquareClick={handleSquareClick}
-                onPieceDrop={handlePieceDrop}
-                selectedSquare={selectedSquare}
-                availableMoves={availableMoves}
-                isFlipped={settings.boardOrientation === "black"}
-                analysisArrows={
-                  settings.showAnalysisArrows ? analysisArrows : []
-                }
-                arePiecesDraggable={arePiecesDraggable}
-                humanColor={settings.humanColor}
-                aiColor={settings.aiColor}
-                gameMode={settings.mode}
-              />
+              <div className="flex flex-col md:flex-row gap-3 md:items-stretch">
+                <div className="order-2 md:order-1 flex-1 min-w-0">
+                  <ChessBoard
+                    chess={chess}
+                    onSquareClick={handleSquareClick}
+                    onPieceDrop={handlePieceDrop}
+                    selectedSquare={selectedSquare}
+                    availableMoves={availableMoves}
+                    isFlipped={settings.boardOrientation === "black"}
+                    analysisArrows={
+                      settings.showAnalysisArrows ? analysisArrows : []
+                    }
+                    arePiecesDraggable={arePiecesDraggable}
+                    humanColor={settings.humanColor}
+                    aiColor={settings.aiColor}
+                    gameMode={settings.mode}
+                  />
+                </div>
+                <div className="order-1 md:order-2 md:pt-8">
+                  <EvaluationBar
+                    evaluation={analysis?.evaluation}
+                    mate={analysis?.mate}
+                    isThinking={isThinking}
+                  />
+                </div>
+              </div>
 
               {/* Quick Actions */}
               <div className="mt-4 flex flex-wrap gap-2 justify-center action-row-mobile">
@@ -394,6 +408,11 @@ export function ChessBot({
                             </span>
                           </div>
                         )}
+                        <div className="text-xs md:text-sm text-gray-300 mt-2">
+                          WDL: <span className="text-white">W {wdl.win}%</span>{" "}
+                          • <span className="text-white">D {wdl.draw}%</span> •{" "}
+                          <span className="text-white">L {wdl.loss}%</span>
+                        </div>
                       </div>
                     )}
 
