@@ -834,6 +834,9 @@ export function GameControls({
                       <span className="text-white font-semibold">
                         {wdlArrowScores[0]?.move}
                       </span>
+                      <span className="text-emerald-300 ml-1">
+                        [{wdlArrowScores[0]?.quality ?? 0}]
+                      </span>
                       )
                     </div>
                     <div className="mb-2 flex items-center gap-2">
@@ -918,7 +921,7 @@ export function GameControls({
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-gray-400 w-4 text-right">
-                              {index + 1}.
+                              {item.rank}.
                             </span>
                             <span
                               className="inline-block h-2.5 w-2.5 rounded-full"
@@ -940,6 +943,11 @@ export function GameControls({
                             Score{" "}
                             <span className="text-white">{item.quality}</span> ·
                             W {item.win}% · L {item.loss}%
+                            {item.rank === 1 && (
+                              <span className="ml-1 text-emerald-300">
+                                ★ Best
+                              </span>
+                            )}
                           </div>
                         </button>
                       ))}

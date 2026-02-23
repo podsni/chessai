@@ -365,12 +365,15 @@ export function ChessBoard({
       const { col, row } = getSquarePos(toSquare);
       const left = col * squareSize + squareSize * 0.62;
       const top = row * squareSize + squareSize * 0.12;
+      const isBest = score.rank === 1;
       return {
         key: `${score.engine}-${score.move}-${score.quality}`,
         left,
         top,
         color: score.color,
         quality: Math.round(score.quality),
+        rank: score.rank,
+        isBest,
       };
     });
   }, [arrowScores, boardSize, isFlipped]);
@@ -419,9 +422,13 @@ export function ChessBoard({
                     transform: "translate(-50%, -50%)",
                     backgroundColor: badge.color,
                     border: "1px solid rgba(15,23,42,0.7)",
+                    minWidth: badge.isBest ? "34px" : "22px",
+                    textAlign: "center",
                   }}
                 >
-                  {badge.quality}
+                  {badge.isBest
+                    ? `BEST ${badge.quality}`
+                    : `${badge.rank}:${badge.quality}`}
                 </div>
               ))}
             </div>

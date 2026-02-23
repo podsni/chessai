@@ -40,6 +40,7 @@ export interface AnalysisArrow {
 export interface WdlArrowScore {
   engine: AIEngine;
   move: string;
+  rank: number;
   win: number;
   draw: number;
   loss: number;

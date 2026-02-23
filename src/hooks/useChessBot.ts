@@ -788,7 +788,7 @@ export const useChessBot = (
       }
 
       const bestWin = Math.max(...valid.map((item) => item.winChance));
-      const scores: WdlArrowScore[] = valid.map((item) => {
+      const scores: Omit<WdlArrowScore, "rank">[] = valid.map((item) => {
         const winDrop = bestWin - item.winChance;
         const lossSpike = item.lossChance - baseLoss;
 
@@ -839,14 +839,53 @@ export const useChessBot = (
         };
       });
       scores.sort((a, b) => b.quality - a.quality);
-      const arrows: AnalysisArrow[] = scores.map((score) => ({
+      const rankedScores = scores.map((score, index) => ({
+        ...score,
+        rank: index + 1,
+      }));
+      const arrows: AnalysisArrow[] = rankedScores.map((score) => ({
         from: score.move.slice(0, 2) as Square,
         to: score.move.slice(2, 4) as Square,
         color: score.color,
       }));
-      return { arrows, scores };
+      return { arrows, scores: rankedScores };
     },
     [buildPredictionLine, parseMove, getSafeAnalysis],
+  );
+
+  const mergeWdlPolicyResults = useCallback(
+    (
+      multiWdl: Array<{ arrows: AnalysisArrow[]; scores: WdlArrowScore[] }>,
+    ): { arrows: AnalysisArrow[]; scores: WdlArrowScore[] } => {
+      const scores = multiWdl.flatMap((item) => item.scores);
+      const moveMap = new Map<
+        string,
+        { from: Square; to: Square; colors: Set<string> }
+      >();
+
+      for (const score of scores) {
+        const from = score.move.slice(0, 2) as Square;
+        const to = score.move.slice(2, 4) as Square;
+        const key = `${from}${to}`;
+        const existing = moveMap.get(key);
+        if (existing) {
+          existing.colors.add(score.color);
+        } else {
+          moveMap.set(key, { from, to, colors: new Set([score.color]) });
+        }
+      }
+
+      const arrows: AnalysisArrow[] = Array.from(moveMap.values()).map(
+        (item) => ({
+          from: item.from,
+          to: item.to,
+          color: item.colors.size > 1 ? "#facc15" : Array.from(item.colors)[0],
+        }),
+      );
+
+      return { arrows, scores };
+    },
+    [],
   );
 
   const handleAnalyzePosition = useCallback(
@@ -974,11 +1013,10 @@ export const useChessBot = (
                   }),
                 ),
               );
-              const mergedArrows = multiWdl.flatMap((item) => item.arrows);
-              const mergedScores = multiWdl.flatMap((item) => item.scores);
-              if (mergedArrows.length > 0) {
-                setAnalysisArrows(mergedArrows);
-                setWdlArrowScores(mergedScores);
+              const merged = mergeWdlPolicyResults(multiWdl);
+              if (merged.arrows.length > 0) {
+                setAnalysisArrows(merged.arrows);
+                setWdlArrowScores(merged.scores);
               } else {
                 setAnalysisArrows([]);
                 setWdlArrowScores([]);
@@ -1121,6 +1159,7 @@ export const useChessBot = (
       settings,
       shouldRenderArrows,
       buildWdlPolicyArrows,
+      mergeWdlPolicyResults,
       createAnalysisArrows,
       getSafeAnalysis,
       pickSafeMove,
@@ -1450,11 +1489,10 @@ export const useChessBot = (
                 }),
               ),
             );
-            const mergedArrows = multiWdl.flatMap((item) => item.arrows);
-            const mergedScores = multiWdl.flatMap((item) => item.scores);
-            if (mergedArrows.length > 0) {
-              setAnalysisArrows(mergedArrows);
-              setWdlArrowScores(mergedScores);
+            const merged = mergeWdlPolicyResults(multiWdl);
+            if (merged.arrows.length > 0) {
+              setAnalysisArrows(merged.arrows);
+              setWdlArrowScores(merged.scores);
             } else {
               setAnalysisArrows([]);
               setWdlArrowScores([]);
@@ -1585,6 +1623,7 @@ export const useChessBot = (
     settings,
     shouldRenderArrows,
     buildWdlPolicyArrows,
+    mergeWdlPolicyResults,
     createAnalysisArrows,
     getSafeAnalysis,
     parseMove,
