@@ -35,7 +35,13 @@ const defaultSettings: GameSettings = {
   humanColor: "white",
   aiColor: "black",
   aiDepth: 10,
+  aiEngine: "stockfish-online",
+  analysisEngineMode: "safe",
+  battleEnabled: false,
+  battleOpponentEngine: "chess-api",
   showAnalysisArrows: true,
+  wdlPolicyArrows: true,
+  wdlShowAllArrowsDefault: true,
   autoAnalysis: false,
   analysisMode: false,
 };

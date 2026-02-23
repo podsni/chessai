@@ -1,7 +1,10 @@
 import { Chessboard } from "react-chessboard";
 import { Chess, Square } from "chess.js";
-import { useState, useEffect, useCallback, useRef } from "react";
-import { AnalysisArrow as AnalysisArrowType } from "../types/chess";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import {
+  AnalysisArrow as AnalysisArrowType,
+  WdlArrowScore,
+} from "../types/chess";
 
 interface ChessBoardProps {
   chess: Chess;
@@ -11,6 +14,7 @@ interface ChessBoardProps {
   availableMoves: Square[];
   isFlipped: boolean;
   analysisArrows: AnalysisArrowType[];
+  arrowScores?: WdlArrowScore[];
   arePiecesDraggable: boolean;
   humanColor?: "white" | "black";
   aiColor?: "white" | "black";
@@ -25,6 +29,7 @@ export function ChessBoard({
   availableMoves,
   isFlipped,
   analysisArrows,
+  arrowScores = [],
   arePiecesDraggable,
   humanColor = "white",
   aiColor: _aiColor = "black",
@@ -108,40 +113,64 @@ export function ChessBoard({
   }, []);
 
   // Convert our analysis arrows to react-chessboard format
-  const customArrows = analysisArrows.map(
-    (arrow) => [arrow.from as Square, arrow.to as Square] as [Square, Square],
-  );
+  const customArrows = useMemo(() => {
+    // react-chessboard uses start/end for arrow identity.
+    // Deduplicate identical move arrows to avoid duplicate React keys.
+    const grouped = new Map<string, AnalysisArrowType[]>();
+    analysisArrows.forEach((arrow) => {
+      const key = `${arrow.from}-${arrow.to}`;
+      const list = grouped.get(key) || [];
+      list.push(arrow);
+      grouped.set(key, list);
+    });
+
+    return Array.from(grouped.values()).map((group) => {
+      const base = group[0];
+      const hasDifferentColors = group.some(
+        (item) => (item.color || "#7fb069") !== (base.color || "#7fb069"),
+      );
+      return {
+        startSquare: base.from as Square,
+        endSquare: base.to as Square,
+        color: hasDifferentColors ? "#facc15" : base.color || "#7fb069",
+      };
+    });
+  }, [analysisArrows]);
 
   // Custom square styles for selected square and available moves
-  const customSquareStyles: { [square: string]: React.CSSProperties } = {};
+  const customSquareStyles = useMemo(() => {
+    const styles: Record<string, React.CSSProperties> = {};
 
-  // Highlight selected square
-  if (selectedSquare) {
-    customSquareStyles[selectedSquare] = {
-      backgroundColor: "rgba(255, 255, 0, 0.4)",
-      border: "3px solid #f1c40f",
-      boxSizing: "border-box",
-    };
-  }
-
-  // Highlight available moves
-  availableMoves.forEach((square) => {
-    const piece = chess.get(square);
-    if (piece) {
-      // Square with piece (capture)
-      customSquareStyles[square] = {
-        background:
-          "radial-gradient(circle, rgba(0,0,0,.1) 85%, transparent 85%)",
-        backgroundColor: "rgba(255, 0, 0, 0.3)",
-      };
-    } else {
-      // Empty square
-      customSquareStyles[square] = {
-        background: "radial-gradient(circle, #7fb069 25%, transparent 25%)",
-        backgroundColor: "transparent",
+    // Highlight selected square
+    if (selectedSquare) {
+      styles[selectedSquare] = {
+        backgroundColor: "rgba(255, 255, 0, 0.4)",
+        border: "3px solid #f1c40f",
+        boxSizing: "border-box",
       };
     }
-  });
+
+    // Highlight available moves
+    availableMoves.forEach((square) => {
+      const piece = chess.get(square);
+      if (piece) {
+        // Square with piece (capture)
+        styles[square] = {
+          background:
+            "radial-gradient(circle, rgba(0,0,0,.1) 85%, transparent 85%)",
+          backgroundColor: "rgba(255, 0, 0, 0.3)",
+        };
+      } else {
+        // Empty square
+        styles[square] = {
+          background: "radial-gradient(circle, #7fb069 25%, transparent 25%)",
+          backgroundColor: "transparent",
+        };
+      }
+    });
+
+    return styles;
+  }, [availableMoves, chess, selectedSquare]);
 
   // Enhanced square click handler for mobile with improved feedback
   const handleSquareClick = useCallback(
@@ -167,7 +196,16 @@ export function ChessBoard({
 
   // Enhanced piece drop handler with better mobile support
   const handlePieceDrop = useCallback(
-    (sourceSquare: string, targetSquare: string) => {
+    ({
+      sourceSquare,
+      targetSquare,
+    }: {
+      sourceSquare: string;
+      targetSquare: string | null;
+    }) => {
+      if (!targetSquare) return false;
+      if (sourceSquare === targetSquare) return false;
+
       // Mobile haptic feedback without delaying move execution.
       if (isTouchDevice) {
         if (navigator.vibrate) {
@@ -194,7 +232,7 @@ export function ChessBoard({
 
   // Check if a piece can be dragged
   const isDraggablePiece = useCallback(
-    ({ piece }: { piece: string; sourceSquare: string }) => {
+    ({ piece }: { piece: { pieceType: string } }) => {
       if (!arePiecesDraggable) return false;
 
       // On touch devices, be more permissive to allow easier interaction
@@ -203,7 +241,7 @@ export function ChessBoard({
       }
 
       // Desktop behavior: only allow dragging pieces of the current player
-      const pieceColor = piece[0]; // 'w' or 'b'
+      const pieceColor = piece.pieceType[0]; // 'w' or 'b'
       const currentTurn = chess.turn();
 
       return pieceColor === currentTurn;
@@ -211,41 +249,134 @@ export function ChessBoard({
     [arePiecesDraggable, isTouchDevice, chess],
   );
 
-  // Handle piece drag begin
-  const handlePieceDragBegin = useCallback(
-    (_piece: string, sourceSquare: string) => {
-      // For mobile, immediately show available moves
-      if (isTouchDevice) {
-        onSquareClick(sourceSquare as Square);
-      }
-    },
-    [onSquareClick, isTouchDevice],
-  );
-
-  // Handle piece drag end
-  const handlePieceDragEnd = useCallback(
-    (_piece: string, _sourceSquare: string) => {},
-    [],
-  );
-
   // Calculate notation font size based on board size
   const notationFontSize =
     boardSize < 340 ? "8px" : boardSize < 420 ? "10px" : "12px";
 
   // Enhanced mobile-specific board styles
-  const mobileBoardStyle: Record<string, string | number> = {
-    borderRadius: boardSize < 400 ? "6px" : "8px",
-    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
-    border: "2px solid #8b7355",
-    transition: "all 0.3s ease",
-    ...(isTouchDevice && {
-      touchAction: "none", // Prevent scrolling while interacting with board
-      userSelect: "none", // Prevent text selection on mobile
-      WebkitUserSelect: "none",
-      WebkitTouchCallout: "none", // Prevent iOS callout menu
-      WebkitTapHighlightColor: "transparent", // Remove tap highlight
+  const mobileBoardStyle = useMemo<React.CSSProperties>(
+    () => ({
+      borderRadius: boardSize < 400 ? "6px" : "8px",
+      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
+      border: "2px solid #8b7355",
+      transition: "all 0.3s ease",
+      ...(isTouchDevice && {
+        touchAction: "none" as const, // Prevent scrolling while interacting with board
+        userSelect: "none" as const, // Prevent text selection on mobile
+        WebkitUserSelect: "none" as const,
+        WebkitTouchCallout: "none",
+        WebkitTapHighlightColor: "transparent",
+      }),
     }),
-  };
+    [boardSize, isTouchDevice],
+  );
+
+  const chessboardOptions = useMemo(
+    () => ({
+      id: "chess-board",
+      position: chess.fen(),
+      onSquareClick: ({ square }: { square: string }) =>
+        handleSquareClick(square as Square),
+      onPieceClick: ({
+        square,
+      }: {
+        square: string | null;
+        piece: { pieceType: string };
+      }) => {
+        if (isTouchDevice && square) {
+          handleSquareClick(square as Square);
+        }
+      },
+      onPieceDrop: handlePieceDrop,
+      canDragPiece: isDraggablePiece,
+      boardOrientation: (isFlipped ? "black" : "white") as "white" | "black",
+      squareStyles: customSquareStyles,
+      arrows: customArrows,
+      boardStyle: {
+        ...mobileBoardStyle,
+        width: boardSize,
+      },
+      animationDurationInMs: isTouchDevice ? 150 : 200,
+      allowDragging: arePiecesDraggable,
+      showNotation: boardSize > 320,
+      allowDragOffBoard: false,
+      allowDrawingArrows: false,
+      darkSquareStyle: {
+        backgroundColor: "#b58863",
+      },
+      lightSquareStyle: {
+        backgroundColor: "#f0d9b5",
+      },
+      darkSquareNotationStyle: {
+        fontSize: notationFontSize,
+        fontWeight: "600",
+        color: "#5a5a5a",
+      },
+      lightSquareNotationStyle: {
+        fontSize: notationFontSize,
+        fontWeight: "600",
+        color: "#5a5a5a",
+      },
+      alphaNotationStyle: {
+        fontSize: notationFontSize,
+        fontWeight: "600",
+        color: "#5a5a5a",
+      },
+      numericNotationStyle: {
+        fontSize: notationFontSize,
+        fontWeight: "600",
+        color: "#5a5a5a",
+      },
+    }),
+    [
+      arePiecesDraggable,
+      boardSize,
+      chess,
+      customArrows,
+      customSquareStyles,
+      handlePieceDrop,
+      handleSquareClick,
+      isDraggablePiece,
+      isFlipped,
+      isTouchDevice,
+      mobileBoardStyle,
+      notationFontSize,
+    ],
+  );
+
+  const scoreBadges = useMemo(() => {
+    if (arrowScores.length === 0) return [];
+    const squareSize = boardSize / 8;
+
+    const getSquarePos = (square: string) => {
+      const file = square.charCodeAt(0) - 97; // a-h => 0-7
+      const rank = parseInt(square[1], 10); // 1-8
+      let col = file;
+      let row = 8 - rank;
+      if (isFlipped) {
+        col = 7 - col;
+        row = 7 - row;
+      }
+      return { col, row };
+    };
+
+    return arrowScores.map((score) => {
+      const toSquare = score.move.slice(2, 4);
+      const { col, row } = getSquarePos(toSquare);
+      const left = col * squareSize + squareSize * 0.62;
+      const top = row * squareSize + squareSize * 0.12;
+      const isBest = score.rank === 1;
+      return {
+        key: `${score.engine}-${score.move}-${score.quality}`,
+        left,
+        top,
+        color: score.color,
+        quality: Math.round(score.quality),
+        rank: score.rank,
+        isBest,
+      };
+    });
+  }, [arrowScores, boardSize, isFlipped]);
 
   return (
     <div className="relative w-full flex flex-col items-center">
@@ -274,38 +405,35 @@ export function ChessBoard({
         ref={boardContainerRef}
         className="chess-board-container w-full flex justify-center"
       >
-        <Chessboard
-          id="chess-board"
-          position={chess.fen()}
-          onSquareClick={handleSquareClick}
-          onPieceDrop={handlePieceDrop}
-          onPieceDragBegin={handlePieceDragBegin}
-          onPieceDragEnd={handlePieceDragEnd}
-          isDraggablePiece={isDraggablePiece}
-          boardOrientation={isFlipped ? "black" : "white"}
-          customSquareStyles={customSquareStyles}
-          customArrows={customArrows}
-          customArrowColor="#7fb069"
-          boardWidth={boardSize}
-          animationDuration={isTouchDevice ? 150 : 200}
-          arePiecesDraggable={arePiecesDraggable}
-          showBoardNotation={boardSize > 320}
-          snapToCursor={isTouchDevice}
-          customBoardStyle={mobileBoardStyle}
-          arePremovesAllowed={false}
-          showPromotionDialog={true}
-          customDarkSquareStyle={{
-            backgroundColor: "#b58863",
-          }}
-          customLightSquareStyle={{
-            backgroundColor: "#f0d9b5",
-          }}
-          customNotationStyle={{
-            fontSize: notationFontSize,
-            fontWeight: "600",
-            color: "#5a5a5a",
-          }}
-        />
+        <div
+          className="relative"
+          style={{ width: `${boardSize}px`, height: `${boardSize}px` }}
+        >
+          <Chessboard options={chessboardOptions} />
+          {scoreBadges.length > 0 && (
+            <div className="pointer-events-none absolute inset-0 z-20">
+              {scoreBadges.map((badge) => (
+                <div
+                  key={badge.key}
+                  className="absolute rounded px-1 py-0.5 text-[10px] font-bold text-white shadow-md"
+                  style={{
+                    left: `${badge.left}px`,
+                    top: `${badge.top}px`,
+                    transform: "translate(-50%, -50%)",
+                    backgroundColor: badge.color,
+                    border: "1px solid rgba(15,23,42,0.7)",
+                    minWidth: badge.isBest ? "34px" : "22px",
+                    textAlign: "center",
+                  }}
+                >
+                  {badge.isBest
+                    ? `BEST ${badge.quality}`
+                    : `${badge.rank}:${badge.quality}`}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Enhanced Player indicators with Human/AI labels */}

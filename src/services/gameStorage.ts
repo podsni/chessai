@@ -19,7 +19,13 @@ interface GameSettings {
   boardOrientation: "white" | "black";
   humanColor: "white" | "black";
   aiColor: "white" | "black";
+  aiEngine: "stockfish-online" | "chess-api";
+  analysisEngineMode: "single" | "safe" | "both";
+  battleEnabled: boolean;
+  battleOpponentEngine: "stockfish-online" | "chess-api";
   showAnalysisArrows: boolean;
+  wdlPolicyArrows: boolean;
+  wdlShowAllArrowsDefault: boolean;
   autoAnalysis: boolean;
   aiDepth: number;
 }
@@ -116,7 +122,13 @@ class GameStorage {
         boardOrientation: "white",
         humanColor: "white",
         aiColor: "black",
+        aiEngine: "stockfish-online",
+        analysisEngineMode: "safe",
+        battleEnabled: false,
+        battleOpponentEngine: "chess-api",
         showAnalysisArrows: true,
+        wdlPolicyArrows: true,
+        wdlShowAllArrowsDefault: true,
         autoAnalysis: false,
         aiDepth: 10,
       };
@@ -133,7 +145,13 @@ class GameStorage {
         boardOrientation: "white",
         humanColor: "white",
         aiColor: "black",
+        aiEngine: "stockfish-online",
+        analysisEngineMode: "safe",
+        battleEnabled: false,
+        battleOpponentEngine: "chess-api",
         showAnalysisArrows: true,
+        wdlPolicyArrows: true,
+        wdlShowAllArrowsDefault: true,
         autoAnalysis: false,
         aiDepth: 10,
       };

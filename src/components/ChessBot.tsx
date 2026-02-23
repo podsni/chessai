@@ -2,11 +2,27 @@ import { ChessBoard } from "./ChessBoard";
 import { GameControls } from "./GameControls";
 import { SettingsModal } from "./SettingsModal";
 import { FenDisplay } from "./FenDisplay";
+import { AnalysisTimelineChart } from "./AnalysisTimelineChart";
 import { MoveNotation } from "./MoveNotation";
 import { PgnLoadModal } from "./PgnLoadModal";
+import { EvaluationBar } from "./EvaluationBar";
 import { useChessBot } from "../hooks/useChessBot";
-import { useState, useEffect } from "react";
-import type { PersistedGameState } from "../types/chess";
+import { useState, useEffect, useMemo } from "react";
+import {
+  BarChart3,
+  Bot,
+  Crown,
+  FileText,
+  Lightbulb,
+  LocateFixed,
+  RotateCcw,
+  ScanSearch,
+  Settings,
+  Smartphone,
+  Target,
+} from "lucide-react";
+import type { AIEngine, PersistedGameState } from "../types/chess";
+import { estimateWdl } from "../utils/evaluation";
 
 interface ChessBotProps {
   tabId?: string;
@@ -28,6 +44,15 @@ export function ChessBot({
   const [showPgnModal, setShowPgnModal] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [tempName, setTempName] = useState("");
+  const [selectedWdlMove, setSelectedWdlMove] = useState<string | null>(null);
+  const [showAllWdlArrows, setShowAllWdlArrows] = useState(true);
+  const [wdlArrowLimit, setWdlArrowLimit] = useState(3);
+  const [wdlSortBy, setWdlSortBy] = useState<"quality" | "win" | "safety">(
+    "quality",
+  );
+  const [wdlEngineFilter, setWdlEngineFilter] = useState<"all" | AIEngine>(
+    "all",
+  );
 
   useEffect(() => {
     const checkMobile = () => {
@@ -51,9 +76,17 @@ export function ChessBot({
     gameStatus,
     isThinking,
     analysis,
+    engineInsights,
+    wdlArrowScores,
+    evaluationTrend,
+    analysisTimeline,
+    liveAnalysisSeries,
+    loadedPgnResult,
     moveHistory,
     analysisArrows,
     hintMove,
+    isAiVsAiPaused,
+    engineNotice,
     handleSquareClick,
     handlePieceDrop,
     handleSettingsChange,
@@ -68,6 +101,8 @@ export function ChessBot({
     handleLoadFen,
     handleCopyFen,
     handleLoadPGN,
+    handlePauseAiVsAi,
+    handleResumeAiVsAi,
   } = useChessBot(initialGameState, onGameStateChange);
 
   // Determine if pieces should be draggable
@@ -76,17 +111,102 @@ export function ChessBot({
     settings.mode === "human-vs-human" ||
     (settings.mode === "human-vs-ai" &&
       chess.turn() === settings.humanColor[0]);
+  const wdl = estimateWdl(
+    analysis?.evaluation,
+    analysis?.mate,
+    analysis?.winChance,
+  );
+  const orderedWdlArrowScores = useMemo(() => {
+    const scores =
+      wdlEngineFilter === "all"
+        ? [...wdlArrowScores]
+        : wdlArrowScores.filter((score) => score.engine === wdlEngineFilter);
+    if (wdlSortBy === "win") {
+      scores.sort((a, b) => b.win - a.win || b.quality - a.quality);
+    } else if (wdlSortBy === "safety") {
+      scores.sort((a, b) => a.loss - b.loss || b.quality - a.quality);
+    } else {
+      scores.sort((a, b) => b.quality - a.quality);
+    }
+    return scores;
+  }, [wdlArrowScores, wdlSortBy, wdlEngineFilter]);
+  const visibleWdlArrowScores = useMemo(() => {
+    if (!settings.wdlPolicyArrows) return [];
+    const ranked = orderedWdlArrowScores.slice(0, Math.max(1, wdlArrowLimit));
+    if (showAllWdlArrows || !selectedWdlMove) return ranked;
+    return ranked.filter((score) => score.move === selectedWdlMove);
+  }, [
+    settings.wdlPolicyArrows,
+    showAllWdlArrows,
+    selectedWdlMove,
+    orderedWdlArrowScores,
+    wdlArrowLimit,
+  ]);
+  const visibleAnalysisArrows = useMemo(() => {
+    if (!settings.showAnalysisArrows) return [];
+    if (!settings.wdlPolicyArrows) return analysisArrows;
+    const allowedMoves = new Set(
+      visibleWdlArrowScores.map((score) => score.move),
+    );
+    if (allowedMoves.size === 0) return analysisArrows;
+    const filtered = analysisArrows.filter((arrow) =>
+      allowedMoves.has(`${arrow.from}${arrow.to}`),
+    );
+    const byMove = new Map<string, (typeof filtered)[number][]>();
+    filtered.forEach((arrow) => {
+      const key = `${arrow.from}${arrow.to}`;
+      const list = byMove.get(key) || [];
+      list.push(arrow);
+      byMove.set(key, list);
+    });
+    return Array.from(byMove.values()).map((group) => {
+      if (group.length === 1) return group[0];
+      return { ...group[0], color: "#facc15" };
+    });
+  }, [
+    analysisArrows,
+    settings.showAnalysisArrows,
+    settings.wdlPolicyArrows,
+    visibleWdlArrowScores,
+  ]);
+
+  useEffect(() => {
+    if (!settings.wdlPolicyArrows || wdlArrowScores.length === 0) {
+      setSelectedWdlMove(null);
+      setShowAllWdlArrows(settings.wdlShowAllArrowsDefault);
+      return;
+    }
+    if (settings.wdlShowAllArrowsDefault) {
+      setShowAllWdlArrows(true);
+      setSelectedWdlMove(null);
+      return;
+    }
+    if (showAllWdlArrows) return;
+    const ranked = orderedWdlArrowScores.slice(0, Math.max(1, wdlArrowLimit));
+    if (
+      !selectedWdlMove ||
+      !ranked.some((score) => score.move === selectedWdlMove)
+    ) {
+      setSelectedWdlMove(ranked[0].move);
+    }
+  }, [
+    wdlArrowScores,
+    settings.wdlPolicyArrows,
+    settings.wdlShowAllArrowsDefault,
+    selectedWdlMove,
+    showAllWdlArrows,
+    orderedWdlArrowScores,
+    wdlArrowLimit,
+  ]);
 
   return (
     <div className="page-shell min-h-screen">
       {/* Header */}
-      <header className="page-header border-b border-gray-700 shadow-lg">
+      <header className="page-header border-b border-slate-700/80 shadow-lg bg-slate-900/80 backdrop-blur">
         <div className="container mx-auto px-2 py-3 md:px-4 md:py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1 md:gap-3 flex-1 min-w-0">
-              <span className="text-xl md:text-4xl flex-shrink-0 hidden sm:inline">
-                ♔
-              </span>
+              <Crown className="h-5 w-5 md:h-8 md:w-8 flex-shrink-0 text-amber-300 hidden sm:inline" />
               <div className="text-center md:text-left flex-1 min-w-0">
                 {tabId && onRename ? (
                   isRenaming ? (
@@ -133,30 +253,28 @@ export function ChessBot({
                 <p className="text-gray-300 text-xs md:text-sm hidden sm:block">
                   Advanced Chess Analysis with AI • Drag & Drop Enabled
                 </p>
-                <p className="text-gray-300 text-xs sm:hidden">
+                <p className="text-slate-300 text-xs sm:hidden">
                   Chess AI • Touch Enabled
                 </p>
               </div>
-              <span className="text-xl md:text-4xl flex-shrink-0 hidden sm:inline">
-                ♚
-              </span>
+              <Crown className="h-5 w-5 md:h-8 md:w-8 flex-shrink-0 text-slate-200 hidden sm:inline" />
             </div>
             <div className="flex gap-1 md:gap-2 ml-2 md:ml-4 flex-shrink-0">
               <button
                 onClick={() => setShowPgnModal(true)}
-                className="chess-button secondary header-action-btn p-2 md:p-2 text-xs md:text-sm touch-manipulation"
+                className="chess-button secondary header-action-btn h-10 px-3 text-xs md:text-sm touch-manipulation inline-flex items-center gap-1.5"
                 title="Load PGN Game"
               >
-                <span className="hidden md:inline">📝</span>
-                <span className="md:hidden">PGN</span>
+                <FileText className="w-4 h-4" />
+                <span>PGN</span>
               </button>
               <button
                 onClick={() => setShowSettings(true)}
-                className="chess-button secondary header-action-btn p-2 md:p-2 text-xs md:text-sm touch-manipulation"
+                className="chess-button secondary header-action-btn h-10 px-3 text-xs md:text-sm touch-manipulation inline-flex items-center gap-1.5"
                 title="Settings"
               >
-                <span className="hidden md:inline">⚙️</span>
-                <span className="md:hidden">⚙️</span>
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Settings</span>
               </button>
             </div>
           </div>
@@ -165,17 +283,21 @@ export function ChessBot({
 
       {/* Mobile Quick Tips */}
       {isMobile && (
-        <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border-b border-blue-500/30 px-2 py-2 md:px-3 md:py-2">
+        <div className="bg-gradient-to-r from-blue-950/35 to-indigo-950/35 border-b border-blue-500/30 px-2 py-2 md:px-3 md:py-2">
           <div className="text-center">
-            <p className="text-blue-300 text-xs leading-relaxed">
-              💡 <strong>Touch Tips:</strong> Tap piece → Tap destination or
-              drag pieces to move
+            <p className="text-blue-300 text-xs leading-relaxed inline-flex items-center gap-1.5">
+              <Lightbulb className="w-3.5 h-3.5" />
+              <strong>Touch Tips:</strong> Tap piece → Tap destination or drag
+              pieces to move
             </p>
             {selectedSquare && (
               <div className="mt-2 bg-yellow-500/20 rounded-lg px-3 py-1 inline-block">
-                <p className="text-yellow-300 text-xs font-medium">
-                  ✨ Selected:{" "}
-                  <strong className="text-yellow-100">{selectedSquare}</strong>{" "}
+                <p className="text-yellow-300 text-xs font-medium inline-flex items-center gap-1">
+                  <ScanSearch className="w-3.5 h-3.5" />
+                  Selected:{" "}
+                  <strong className="text-yellow-100">
+                    {selectedSquare}
+                  </strong>{" "}
                   → Tap green square to move
                 </p>
               </div>
@@ -191,7 +313,7 @@ export function ChessBot({
             <div className="game-card board-panel p-4 md:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
                 <h2 className="text-lg md:text-xl font-semibold text-white flex items-center gap-2 flex-wrap">
-                  <span>🏁</span>
+                  <Target className="w-5 h-5 text-emerald-400" />
                   <span className="hidden sm:inline">Chess Board</span>
                   <span className="sm:hidden">Board</span>
                   {settings.analysisMode && (
@@ -214,12 +336,18 @@ export function ChessBot({
                   className="flex items-center gap-2 text-xs md:text-sm flex-wrap"
                   style={{ color: "var(--text-light)" }}
                 >
+                  <div className="inline-flex items-center gap-1 rounded-full border border-emerald-700/60 bg-emerald-900/25 px-2 py-1 text-[11px] text-emerald-300">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${isThinking ? "bg-emerald-300 animate-pulse" : "bg-emerald-400"}`}
+                    />
+                    Live Eval
+                  </div>
                   <div className="flex items-center gap-2">
                     <span>Human:</span>
                     <span
                       className={`font-medium px-2 py-1 rounded text-xs ${settings.humanColor === "white" ? "bg-gray-100 text-black" : "bg-gray-800 text-white"}`}
                     >
-                      {settings.humanColor === "white" ? "♔" : "♚"}{" "}
+                      <Crown className="w-3 h-3 inline-block mr-1" />
                       {settings.humanColor}
                     </span>
                   </div>
@@ -229,7 +357,7 @@ export function ChessBot({
                       <span
                         className={`font-medium px-2 py-1 rounded text-xs ${settings.aiColor === "white" ? "bg-gray-100 text-black" : "bg-gray-800 text-white"}`}
                       >
-                        {settings.aiColor === "white" ? "♔" : "♚"}{" "}
+                        <Crown className="w-3 h-3 inline-block mr-1" />
                         {settings.aiColor}
                       </span>
                     </div>
@@ -237,21 +365,33 @@ export function ChessBot({
                 </div>
               </div>
 
-              <ChessBoard
-                chess={chess}
-                onSquareClick={handleSquareClick}
-                onPieceDrop={handlePieceDrop}
-                selectedSquare={selectedSquare}
-                availableMoves={availableMoves}
-                isFlipped={settings.boardOrientation === "black"}
-                analysisArrows={
-                  settings.showAnalysisArrows ? analysisArrows : []
-                }
-                arePiecesDraggable={arePiecesDraggable}
-                humanColor={settings.humanColor}
-                aiColor={settings.aiColor}
-                gameMode={settings.mode}
-              />
+              <div className="flex flex-col md:flex-row gap-3 md:items-stretch">
+                <div className="order-1 md:order-1 md:pt-8">
+                  <EvaluationBar
+                    evaluation={analysis?.evaluation}
+                    mate={analysis?.mate}
+                    winChance={analysis?.winChance}
+                    trend={evaluationTrend}
+                    isThinking={isThinking}
+                  />
+                </div>
+                <div className="order-2 md:order-2 flex-1 min-w-0">
+                  <ChessBoard
+                    chess={chess}
+                    onSquareClick={handleSquareClick}
+                    onPieceDrop={handlePieceDrop}
+                    selectedSquare={selectedSquare}
+                    availableMoves={availableMoves}
+                    isFlipped={settings.boardOrientation === "black"}
+                    analysisArrows={visibleAnalysisArrows}
+                    arrowScores={visibleWdlArrowScores}
+                    arePiecesDraggable={arePiecesDraggable}
+                    humanColor={settings.humanColor}
+                    aiColor={settings.aiColor}
+                    gameMode={settings.mode}
+                  />
+                </div>
+              </div>
 
               {/* Quick Actions */}
               <div className="mt-4 flex flex-wrap gap-2 justify-center action-row-mobile">
@@ -264,7 +404,7 @@ export function ChessBot({
                     {isThinking ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     ) : (
-                      <span>💡</span>
+                      <Lightbulb className="w-4 h-4" />
                     )}
                     <span className="hidden sm:inline">
                       {isThinking ? "Thinking..." : "Get Hint"}
@@ -275,7 +415,7 @@ export function ChessBot({
                   </div>
                 </button>
                 <button
-                  onClick={handleAnalyzePosition}
+                  onClick={() => handleAnalyzePosition({ forceArrows: true })}
                   className={`chess-button flex-1 sm:flex-none min-h-[44px] touch-manipulation ${isThinking ? "pulse" : ""}`}
                   disabled={isThinking}
                 >
@@ -283,7 +423,7 @@ export function ChessBot({
                     {isThinking ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     ) : (
-                      <span>📊</span>
+                      <BarChart3 className="w-4 h-4" />
                     )}
                     <span className="hidden sm:inline">
                       {isThinking ? "Analyzing..." : "Analyze"}
@@ -298,7 +438,7 @@ export function ChessBot({
                   className="chess-button secondary flex-1 sm:flex-none min-h-[44px] touch-manipulation"
                 >
                   <div className="flex items-center justify-center gap-1">
-                    <span>🔄</span>
+                    <RotateCcw className="w-4 h-4" />
                     <span className="hidden sm:inline">Flip</span>
                     <span className="sm:hidden text-xs">Flip</span>
                   </div>
@@ -308,7 +448,7 @@ export function ChessBot({
                   className="chess-button secondary flex-1 sm:flex-none min-h-[44px] touch-manipulation"
                 >
                   <div className="flex items-center justify-center gap-1">
-                    <span>↩️</span>
+                    <RotateCcw className="w-4 h-4" />
                     <span className="hidden sm:inline">Undo</span>
                     <span className="sm:hidden text-xs">Undo</span>
                   </div>
@@ -322,7 +462,7 @@ export function ChessBot({
                     {selectedSquare ? (
                       <div className="text-yellow-300 font-medium">
                         <div className="flex items-center justify-center gap-1">
-                          <span>📍</span>
+                          <LocateFixed className="w-3.5 h-3.5" />
                           <span>
                             Selected: <strong>{selectedSquare}</strong>
                           </span>
@@ -333,7 +473,7 @@ export function ChessBot({
                       </div>
                     ) : (
                       <div className="text-gray-400 flex items-center justify-center gap-1">
-                        <span>🎯</span>
+                        <Target className="w-3.5 h-3.5" />
                         <span>Tap any piece to see moves</span>
                       </div>
                     )}
@@ -350,6 +490,15 @@ export function ChessBot({
                 />
                 <FenDisplay fen={chess.fen()} showLabel={!isMobile} />
               </div>
+
+              <AnalysisTimelineChart
+                timeline={analysisTimeline}
+                liveSeries={liveAnalysisSeries}
+                mode={settings.mode}
+                gameStatus={gameStatus}
+                gameOver={chess.isGameOver()}
+                pgnResult={loadedPgnResult}
+              />
 
               {/* Analysis Display */}
               {(analysis || hintMove) && (
@@ -376,6 +525,11 @@ export function ChessBot({
                             </span>
                           </div>
                         )}
+                        <div className="text-xs md:text-sm text-gray-300 mt-2">
+                          WDL: <span className="text-white">W {wdl.win}%</span>{" "}
+                          • <span className="text-white">D {wdl.draw}%</span> •{" "}
+                          <span className="text-white">L {wdl.loss}%</span>
+                        </div>
                       </div>
                     )}
 
@@ -408,7 +562,9 @@ export function ChessBot({
               onStartAsBlack={handleStartAsBlack}
               onUndo={handleUndo}
               onFlipBoard={handleFlipBoard}
-              onAnalyzePosition={handleAnalyzePosition}
+              onAnalyzePosition={() =>
+                handleAnalyzePosition({ forceArrows: true })
+              }
               onGetHint={handleGetHint}
               onBotMove={handleBotMove}
               onLoadFen={handleLoadFen}
@@ -419,10 +575,36 @@ export function ChessBot({
               moveHistory={moveHistory}
               evaluation={analysis?.evaluation}
               mate={analysis?.mate}
+              winChance={analysis?.winChance}
               bestMove={analysis?.bestmove}
               hintMove={hintMove || undefined}
               isAnalysisMode={settings.analysisMode}
               boardOrientation={settings.boardOrientation}
+              isAiVsAiPaused={isAiVsAiPaused}
+              engineNotice={engineNotice}
+              engineInsights={engineInsights}
+              wdlArrowScores={orderedWdlArrowScores.slice(
+                0,
+                Math.max(1, wdlArrowLimit),
+              )}
+              selectedWdlMove={selectedWdlMove}
+              isShowingAllWdlArrows={showAllWdlArrows}
+              wdlArrowLimit={wdlArrowLimit}
+              onWdlArrowLimitChange={setWdlArrowLimit}
+              wdlSortBy={wdlSortBy}
+              onWdlSortByChange={setWdlSortBy}
+              wdlEngineFilter={wdlEngineFilter}
+              onWdlEngineFilterChange={setWdlEngineFilter}
+              onSelectWdlMove={(move) => {
+                setShowAllWdlArrows(false);
+                setSelectedWdlMove(move);
+              }}
+              onShowAllWdlArrows={() => {
+                setShowAllWdlArrows(true);
+                setSelectedWdlMove(null);
+              }}
+              onPauseAiVsAi={handlePauseAiVsAi}
+              onResumeAiVsAi={handleResumeAiVsAi}
             />
           </div>
         </div>
@@ -442,15 +624,15 @@ export function ChessBot({
             <div className="flex justify-center items-center gap-1 md:gap-4 mt-2 flex-wrap text-xs">
               <span className="text-gray-500 hidden md:inline">Features:</span>
               <div className="flex items-center gap-1 bg-gray-800 rounded-full px-2 py-1">
-                <span className="text-green-400">🤖</span>
+                <Bot className="w-3.5 h-3.5 text-green-400" />
                 <span className="text-gray-400">AI Analysis</span>
               </div>
               <div className="flex items-center gap-1 bg-gray-800 rounded-full px-2 py-1">
-                <span className="text-blue-400">👆</span>
+                <Target className="w-3.5 h-3.5 text-blue-400" />
                 <span className="text-gray-400">Touch Enabled</span>
               </div>
               <div className="flex items-center gap-1 bg-gray-800 rounded-full px-2 py-1">
-                <span className="text-purple-400">📱</span>
+                <Smartphone className="w-3.5 h-3.5 text-purple-400" />
                 <span className="text-gray-400">Mobile Ready</span>
               </div>
             </div>

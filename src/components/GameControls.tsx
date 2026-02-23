@@ -1,7 +1,21 @@
 import { useState } from "react";
+import { Chess } from "chess.js";
 import { MiniBoard } from "./MiniBoard";
 import Skeleton, { SkeletonTheme } from "react-loading-skeleton";
-import type { GameSettings, GameMode } from "../types/chess";
+import {
+  getAiMoveDepthLimit,
+  getAnalysisDepthLimit,
+  getUiDepthLimit,
+} from "../utils/engineConstraints";
+import { estimateWdl, hasEvaluationData } from "../utils/evaluation";
+import type {
+  AIEngine,
+  AnalysisEngineMode,
+  EngineInsight,
+  GameSettings,
+  GameMode,
+  WdlArrowScore,
+} from "../types/chess";
 
 interface GameControlsProps {
   settings: GameSettings;
@@ -22,10 +36,27 @@ interface GameControlsProps {
   moveHistory: string[];
   evaluation?: number | null;
   mate?: number | null;
+  winChance?: number | null;
   bestMove?: string;
   hintMove?: string;
   isAnalysisMode: boolean;
   boardOrientation: "white" | "black";
+  isAiVsAiPaused: boolean;
+  engineNotice: string | null;
+  engineInsights: EngineInsight[];
+  wdlArrowScores: WdlArrowScore[];
+  selectedWdlMove: string | null;
+  isShowingAllWdlArrows: boolean;
+  wdlArrowLimit: number;
+  onWdlArrowLimitChange: (value: number) => void;
+  wdlSortBy: "quality" | "win" | "safety";
+  onWdlSortByChange: (value: "quality" | "win" | "safety") => void;
+  wdlEngineFilter: "all" | AIEngine;
+  onWdlEngineFilterChange: (value: "all" | AIEngine) => void;
+  onSelectWdlMove: (move: string | null) => void;
+  onShowAllWdlArrows: () => void;
+  onPauseAiVsAi: () => void;
+  onResumeAiVsAi: () => void;
 }
 
 export function GameControls({
@@ -46,11 +77,28 @@ export function GameControls({
   moveHistory,
   evaluation,
   mate,
+  winChance,
   bestMove,
   hintMove,
   isAnalysisMode,
   currentFen,
   boardOrientation,
+  isAiVsAiPaused,
+  engineNotice,
+  engineInsights,
+  wdlArrowScores,
+  selectedWdlMove,
+  isShowingAllWdlArrows,
+  wdlArrowLimit,
+  onWdlArrowLimitChange,
+  wdlSortBy,
+  onWdlSortByChange,
+  wdlEngineFilter,
+  onWdlEngineFilterChange,
+  onSelectWdlMove,
+  onShowAllWdlArrows,
+  onPauseAiVsAi,
+  onResumeAiVsAi,
 }: GameControlsProps) {
   const [fenInput, setFenInput] = useState("");
   const [showPrediction, setShowPrediction] = useState(false);
@@ -71,6 +119,56 @@ export function GameControls({
       return evalValue > 0 ? `+${evalValue.toFixed(2)}` : evalValue.toFixed(2);
     }
     return "—";
+  };
+
+  const formatEvalSigned = (
+    value?: number | null,
+    mateValue?: number | null,
+  ) => {
+    if (mateValue !== null && mateValue !== undefined) {
+      return mateValue > 0
+        ? `+M${Math.abs(mateValue)}`
+        : `-M${Math.abs(mateValue)}`;
+    }
+    if (value === null || value === undefined) return "—";
+    const cp = value / 100;
+    return `${cp > 0 ? "+" : ""}${cp.toFixed(2)}`;
+  };
+
+  const invertEval = (value?: number | null) =>
+    value === null || value === undefined ? undefined : -value;
+  const invertMate = (mateValue?: number | null) =>
+    mateValue === null || mateValue === undefined ? undefined : -mateValue;
+
+  const engineLabels: Record<AIEngine, string> = {
+    "stockfish-online": "Stockfish Online",
+    "chess-api": "Chess API",
+  };
+  const analysisModeLabels: Record<AnalysisEngineMode, string> = {
+    single: "Selected Engine",
+    safe: "Safe (Consensus)",
+    both: "Dual Engines",
+  };
+  const uiDepthLimit = getUiDepthLimit(settings);
+  const aiMoveDepthLimit = getAiMoveDepthLimit(settings);
+  const analysisDepthLimit = getAnalysisDepthLimit(settings);
+  const hasWdl = hasEvaluationData(evaluation, mate, winChance);
+  const wdl = hasWdl
+    ? estimateWdl(evaluation ?? undefined, mate, winChance)
+    : null;
+
+  const buildPredictionSteps = (fen: string, moves: string[], maxSteps = 4) => {
+    const board = new Chess(fen);
+    const steps: Array<{ fen: string; move: string; step: number }> = [];
+    for (const move of moves.slice(0, maxSteps)) {
+      steps.push({ fen: board.fen(), move, step: steps.length + 1 });
+      try {
+        board.move(move);
+      } catch {
+        break;
+      }
+    }
+    return steps;
   };
 
   return (
@@ -105,10 +203,117 @@ export function GameControls({
               </span>
             )}
           </div>
+          <div className="mt-2 text-xs" style={{ color: "var(--text-light)" }}>
+            Engine:{" "}
+            <span className="text-white font-medium">
+              {engineLabels[settings.aiEngine]}
+            </span>
+            {settings.mode === "ai-vs-ai" && (
+              <span className="text-gray-300">
+                {" "}
+                (White: {engineLabels[settings.aiEngine]} vs Black:{" "}
+                {engineLabels[settings.battleOpponentEngine]})
+              </span>
+            )}
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+            <div className="rounded border border-gray-700 bg-gray-900/70 px-2 py-1 text-gray-300">
+              <div className="text-gray-400">White</div>
+              <div className="text-white font-semibold">
+                {formatEvalSigned(evaluation, mate)}
+              </div>
+            </div>
+            <div className="rounded border border-gray-700 bg-gray-900/70 px-2 py-1 text-gray-300">
+              <div className="text-gray-400">Black</div>
+              <div className="text-white font-semibold">
+                {formatEvalSigned(invertEval(evaluation), invertMate(mate))}
+              </div>
+            </div>
+          </div>
+          {settings.mode === "human-vs-ai" && (
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded border border-blue-700/40 bg-blue-900/20 px-2 py-1 text-blue-200">
+                <div className="text-blue-300">
+                  Human ({settings.humanColor})
+                </div>
+                <div className="text-white font-semibold">
+                  {settings.humanColor === "white"
+                    ? formatEvalSigned(evaluation, mate)
+                    : formatEvalSigned(
+                        invertEval(evaluation),
+                        invertMate(mate),
+                      )}
+                </div>
+              </div>
+              <div className="rounded border border-emerald-700/40 bg-emerald-900/20 px-2 py-1 text-emerald-200">
+                <div className="text-emerald-300">AI ({settings.aiColor})</div>
+                <div className="text-white font-semibold">
+                  {settings.aiColor === "white"
+                    ? formatEvalSigned(evaluation, mate)
+                    : formatEvalSigned(
+                        invertEval(evaluation),
+                        invertMate(mate),
+                      )}
+                </div>
+              </div>
+            </div>
+          )}
+          {settings.mode === "ai-vs-ai" && (
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded border border-gray-700 bg-gray-900/70 px-2 py-1 text-gray-300">
+                <div className="text-gray-400">
+                  White ({engineLabels[settings.aiEngine]})
+                </div>
+                <div className="text-white font-semibold">
+                  {formatEvalSigned(evaluation, mate)}
+                </div>
+              </div>
+              <div className="rounded border border-gray-700 bg-gray-900/70 px-2 py-1 text-gray-300">
+                <div className="text-gray-400">
+                  Black ({engineLabels[settings.battleOpponentEngine]})
+                </div>
+                <div className="text-white font-semibold">
+                  {formatEvalSigned(invertEval(evaluation), invertMate(mate))}
+                </div>
+              </div>
+            </div>
+          )}
+          {
+            <div className="mt-1 text-xs text-gray-300">
+              Analyze Mode:{" "}
+              <span className="text-white font-medium">
+                {analysisModeLabels[settings.analysisEngineMode]}
+              </span>
+              <span className="ml-2 text-emerald-300">
+                • Eval realtime aktif di semua mode
+              </span>
+            </div>
+          }
+          {engineNotice && (
+            <div className="mt-2 text-xs text-amber-300 bg-amber-900/20 border border-amber-700/30 rounded px-2 py-1">
+              {engineNotice}
+            </div>
+          )}
+          {(settings.analysisMode || settings.mode === "ai-vs-ai") && (
+            <div className="mt-2 text-[11px] text-gray-300 flex flex-wrap gap-3">
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-[#3b82f6]" />
+                Stockfish best
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-[#22c55e]" />
+                Chess-API best
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
+                Blunder (loss spike)
+              </span>
+            </div>
+          )}
         </div>
 
         {/* AI Prediction Mini Board */}
-        {(bestMove || hintMove) && (
+        {(bestMove || hintMove || engineInsights.length > 0) && (
           <div className="game-card control-section p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -127,26 +332,82 @@ export function GameControls({
 
             {showPrediction && (
               <div className="space-y-3">
-                {bestMove && (
-                  <MiniBoard
-                    fen={currentFen}
-                    bestMove={bestMove}
-                    evaluation={evaluation}
-                    mate={mate}
-                    title="Best Move"
-                    boardOrientation={boardOrientation}
-                  />
-                )}
+                {engineInsights.length > 0 ? (
+                  engineInsights.map((insight) => {
+                    const steps = buildPredictionSteps(
+                      currentFen,
+                      insight.predictionLine,
+                      3,
+                    );
+                    return (
+                      <div
+                        key={insight.engine}
+                        className="rounded-lg border border-gray-700 bg-gray-900/50 p-3 space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-semibold text-white">
+                            {engineLabels[insight.engine]}
+                          </h4>
+                          <span className="text-xs text-gray-300">
+                            {insight.mate !== null && insight.mate !== undefined
+                              ? `M${Math.abs(insight.mate)}`
+                              : insight.evaluation !== null &&
+                                  insight.evaluation !== undefined
+                                ? `${insight.evaluation > 0 ? "+" : ""}${(insight.evaluation / 100).toFixed(2)}`
+                                : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {insight.predictionLine.slice(0, 6).map((move, i) => (
+                            <span
+                              key={`${insight.engine}-${move}-${i}`}
+                              className="text-[11px] font-mono bg-gray-800 text-gray-200 px-2 py-1 rounded"
+                            >
+                              {i + 1}. {move}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                          {steps.map((step) => (
+                            <MiniBoard
+                              key={`${insight.engine}-step-${step.step}`}
+                              fen={step.fen}
+                              bestMove={step.move}
+                              evaluation={insight.evaluation}
+                              mate={insight.mate}
+                              title={`Step ${step.step}`}
+                              boardOrientation={boardOrientation}
+                              size={150}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <>
+                    {bestMove && (
+                      <MiniBoard
+                        fen={currentFen}
+                        bestMove={bestMove}
+                        evaluation={evaluation}
+                        mate={mate}
+                        title="Best Move"
+                        boardOrientation={boardOrientation}
+                      />
+                    )}
 
-                {hintMove && hintMove !== bestMove && (
-                  <MiniBoard
-                    fen={currentFen}
-                    bestMove={hintMove}
-                    evaluation={evaluation}
-                    mate={mate}
-                    title="Hint Move"
-                    boardOrientation={boardOrientation}
-                  />
+                    {hintMove && hintMove !== bestMove && (
+                      <MiniBoard
+                        fen={currentFen}
+                        bestMove={hintMove}
+                        evaluation={evaluation}
+                        mate={mate}
+                        title="Hint Move"
+                        boardOrientation={boardOrientation}
+                      />
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -219,6 +480,25 @@ export function GameControls({
               </button>
             ))}
           </div>
+
+          {settings.mode === "ai-vs-ai" && (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                onClick={onPauseAiVsAi}
+                className="chess-button secondary w-full"
+                disabled={isAiVsAiPaused || isThinking}
+              >
+                ⏸ Stop
+              </button>
+              <button
+                onClick={onResumeAiVsAi}
+                className="chess-button w-full"
+                disabled={!isAiVsAiPaused || isThinking}
+              >
+                ▶ Resume
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Game Controls */}
@@ -321,7 +601,7 @@ export function GameControls({
                 <input
                   type="range"
                   min="1"
-                  max="15"
+                  max={uiDepthLimit}
                   value={settings.aiDepth}
                   onChange={(e) =>
                     onSettingsChange({ aiDepth: parseInt(e.target.value) })
@@ -332,10 +612,82 @@ export function GameControls({
                   className="text-xs"
                   style={{ color: "var(--text-light)" }}
                 >
-                  Strong (15)
+                  Strong ({uiDepthLimit})
                 </span>
               </div>
+              <p className="mt-2 text-[11px] text-gray-400">
+                Limit AI Move: {aiMoveDepthLimit} • Limit Analyze/Hint:{" "}
+                {analysisDepthLimit}
+              </p>
             </div>
+
+            <div>
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: "var(--text-light)" }}
+              >
+                {settings.mode === "ai-vs-ai" ? "White Engine" : "AI Engine"}
+              </label>
+              <select
+                value={settings.aiEngine}
+                onChange={(e) =>
+                  onSettingsChange({ aiEngine: e.target.value as AIEngine })
+                }
+                className="chess-input w-full"
+              >
+                <option value="stockfish-online">Stockfish Online</option>
+                <option value="chess-api">Chess API</option>
+              </select>
+            </div>
+
+            {
+              <div>
+                <label
+                  className="block text-sm font-medium mb-2"
+                  style={{ color: "var(--text-light)" }}
+                >
+                  Analysis Engine Strategy
+                </label>
+                <select
+                  value={settings.analysisEngineMode}
+                  onChange={(e) =>
+                    onSettingsChange({
+                      analysisEngineMode: e.target.value as AnalysisEngineMode,
+                    })
+                  }
+                  className="chess-input w-full"
+                >
+                  <option value="safe">Safe (Consensus 2 engines)</option>
+                  <option value="single">Selected Engine Only</option>
+                  <option value="both">Dual Engines + Dual Arrows</option>
+                </select>
+              </div>
+            }
+
+            {settings.mode === "ai-vs-ai" && (
+              <>
+                <div>
+                  <label
+                    className="block text-sm font-medium mb-2"
+                    style={{ color: "var(--text-light)" }}
+                  >
+                    Black Engine
+                  </label>
+                  <select
+                    value={settings.battleOpponentEngine}
+                    onChange={(e) =>
+                      onSettingsChange({
+                        battleOpponentEngine: e.target.value as AIEngine,
+                      })
+                    }
+                    className="chess-input w-full"
+                  >
+                    <option value="stockfish-online">Stockfish Online</option>
+                    <option value="chess-api">Chess API</option>
+                  </select>
+                </div>
+              </>
+            )}
 
             <div className="flex items-center gap-3">
               <input
@@ -371,7 +723,46 @@ export function GameControls({
                 className="text-sm"
                 style={{ color: "var(--text-light)" }}
               >
-                Auto Analysis After Each Move
+                Auto Analysis (All Modes)
+              </label>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="wdlPolicyArrows"
+                checked={settings.wdlPolicyArrows}
+                onChange={(e) =>
+                  onSettingsChange({ wdlPolicyArrows: e.target.checked })
+                }
+                className="chess-checkbox"
+              />
+              <label
+                htmlFor="wdlPolicyArrows"
+                className="text-sm"
+                style={{ color: "var(--text-light)" }}
+              >
+                WDL Policy Arrows (score-based)
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="wdlShowAllArrowsDefault"
+                checked={settings.wdlShowAllArrowsDefault}
+                onChange={(e) =>
+                  onSettingsChange({
+                    wdlShowAllArrowsDefault: e.target.checked,
+                  })
+                }
+                className="chess-checkbox"
+              />
+              <label
+                htmlFor="wdlShowAllArrowsDefault"
+                className="text-sm"
+                style={{ color: "var(--text-light)" }}
+              >
+                Default Show All WDL Arrows
               </label>
             </div>
           </div>
@@ -427,6 +818,145 @@ export function GameControls({
                   </span>
                 </div>
               )}
+              {!isThinking && wdl && (
+                <div className="text-xs text-gray-300 mt-2">
+                  WDL: <span className="text-white">W {wdl.win}%</span> •{" "}
+                  <span className="text-white">D {wdl.draw}%</span> •{" "}
+                  <span className="text-white">L {wdl.loss}%</span>
+                </div>
+              )}
+              {!isThinking &&
+                settings.wdlPolicyArrows &&
+                wdlArrowScores.length > 0 && (
+                  <div className="mt-3 rounded border border-gray-700 bg-gray-900/50 p-2">
+                    <div className="text-xs text-gray-300 mb-2">
+                      Arrow Scores (Top Recommendation:{" "}
+                      <span className="text-white font-semibold">
+                        {wdlArrowScores[0]?.move}
+                      </span>
+                      <span className="text-emerald-300 ml-1">
+                        [{wdlArrowScores[0]?.quality ?? 0}]
+                      </span>
+                      )
+                    </div>
+                    <div className="mb-2 flex items-center gap-2">
+                      <label className="text-xs text-gray-300">
+                        Arrows:
+                        <select
+                          value={wdlArrowLimit}
+                          onChange={(e) =>
+                            onWdlArrowLimitChange(parseInt(e.target.value, 10))
+                          }
+                          className="ml-1 bg-gray-800 text-white rounded px-1 py-0.5 border border-gray-600"
+                        >
+                          <option value={1}>1</option>
+                          <option value={2}>2</option>
+                          <option value={3}>3</option>
+                        </select>
+                      </label>
+                      <label className="text-xs text-gray-300">
+                        Sort:
+                        <select
+                          value={wdlSortBy}
+                          onChange={(e) =>
+                            onWdlSortByChange(
+                              e.target.value as "quality" | "win" | "safety",
+                            )
+                          }
+                          className="ml-1 bg-gray-800 text-white rounded px-1 py-0.5 border border-gray-600"
+                        >
+                          <option value="quality">Score</option>
+                          <option value="win">Win %</option>
+                          <option value="safety">Safe (Low Loss)</option>
+                        </select>
+                      </label>
+                      <label className="text-xs text-gray-300">
+                        Engine:
+                        <select
+                          value={wdlEngineFilter}
+                          onChange={(e) =>
+                            onWdlEngineFilterChange(
+                              e.target.value as "all" | AIEngine,
+                            )
+                          }
+                          className="ml-1 bg-gray-800 text-white rounded px-1 py-0.5 border border-gray-600"
+                        >
+                          <option value="all">All</option>
+                          <option value="stockfish-online">Stockfish</option>
+                          <option value="chess-api">Chess-API</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div className="mb-2 flex items-center gap-2">
+                      <button
+                        onClick={() =>
+                          onSelectWdlMove(wdlArrowScores[0]?.move ?? null)
+                        }
+                        className={`chess-button text-xs px-2 py-1 ${
+                          !isShowingAllWdlArrows ? "" : "secondary"
+                        }`}
+                      >
+                        Show Top Arrow
+                      </button>
+                      <button
+                        onClick={onShowAllWdlArrows}
+                        className={`chess-button text-xs px-2 py-1 ${
+                          isShowingAllWdlArrows ? "" : "secondary"
+                        }`}
+                      >
+                        Show All Arrows
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      {wdlArrowScores.slice(0, 3).map((item, index) => (
+                        <button
+                          key={`${item.engine}-${item.move}-${index}`}
+                          onClick={() => onSelectWdlMove(item.move)}
+                          className={`w-full text-left flex items-center justify-between rounded px-2 py-1 text-[11px] border ${
+                            !isShowingAllWdlArrows &&
+                            selectedWdlMove === item.move
+                              ? "bg-blue-900/40 border-blue-500/60"
+                              : "bg-gray-800/70 border-gray-700/70"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400 w-4 text-right">
+                              {item.rank}.
+                            </span>
+                            <span
+                              className="inline-block h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <span className="font-mono text-white">
+                              {item.move}
+                            </span>
+                            <span className="text-[10px] text-gray-400">
+                              {item.engine === "stockfish-online"
+                                ? "Stockfish"
+                                : "Chess-API"}
+                            </span>
+                            <span className="text-gray-300 capitalize">
+                              {item.verdict}
+                            </span>
+                          </div>
+                          <div className="text-gray-300">
+                            Score{" "}
+                            <span className="text-white">{item.quality}</span> ·
+                            W {item.win}% · L {item.loss}%
+                            {item.rank === 1 && (
+                              <span className="ml-1 text-emerald-300">
+                                ★ Best
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 text-[11px] text-gray-400">
+                      Tap row to focus one arrow on board.
+                    </div>
+                  </div>
+                )}
             </div>
           )}
         </div>

@@ -2,6 +2,7 @@ interface StockfishApiResponse {
   success: boolean;
   evaluation?: number;
   mate?: number;
+  winChance?: number;
   bestmove?: string;
   continuation?: string;
 }
@@ -14,13 +15,61 @@ interface TopMove {
 }
 
 export class StockfishAPI {
-  private baseUrl = "https://stockfish.online/api/s/v2.php";
+  private baseUrl = this.resolveBaseUrl();
+  private cooldownUntil = 0;
+  private cooldownReason: string | null = null;
+
+  private resolveBaseUrl() {
+    if (
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1")
+    ) {
+      return "/api/stockfish";
+    }
+    return "https://stockfish.online/api/s/v2.php";
+  }
+
+  private setCooldown(milliseconds: number, reason: string) {
+    const nextUntil = Date.now() + milliseconds;
+    if (nextUntil > this.cooldownUntil) {
+      this.cooldownUntil = nextUntil;
+      this.cooldownReason = reason;
+    }
+  }
+
+  private normalizeEvaluation(raw?: number): number | undefined {
+    if (raw === undefined || raw === null) return undefined;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return undefined;
+    // stockfish.online may return pawn units (e.g. 1.36) instead of centipawns.
+    if (Math.abs(parsed) <= 25) {
+      return Math.round(parsed * 100);
+    }
+    return Math.round(parsed);
+  }
 
   async getAnalysis(fen: string, depth: number): Promise<StockfishApiResponse> {
+    if (Date.now() < this.cooldownUntil) {
+      throw new Error(
+        `Stockfish Online temporarily unavailable (${this.cooldownReason || "engine error"})`,
+      );
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 8000);
     try {
       const response = await fetch(
         `${this.baseUrl}?fen=${encodeURIComponent(fen)}&depth=${depth}`,
+        { signal: controller.signal },
       );
+      if (!response.ok) {
+        if (response.status === 429) {
+          this.setCooldown(60_000, "rate limit (429)");
+        }
+        throw new Error(`Stockfish Online request failed: ${response.status}`);
+      }
+
       const data = (await response.json()) as StockfishApiResponse;
 
       if (!data.success) {
@@ -30,14 +79,25 @@ export class StockfishAPI {
       // Transform the API response to match our interface
       return {
         success: data.success,
-        evaluation: data.evaluation || undefined,
-        mate: data.mate || undefined,
-        bestmove: data.bestmove || undefined, // Keep original field name
-        continuation: data.continuation || undefined,
+        evaluation: this.normalizeEvaluation(data.evaluation),
+        mate: data.mate ?? undefined,
+        bestmove: data.bestmove ?? undefined, // Keep original field name
+        continuation: data.continuation ?? undefined,
       };
     } catch (error) {
-      console.error("Error fetching analysis:", error);
+      if (error instanceof Error) {
+        if (error.name === "AbortError") {
+          this.setCooldown(45_000, "request timeout");
+        } else if (
+          error instanceof TypeError ||
+          error.message.includes("Failed to fetch")
+        ) {
+          this.setCooldown(120_000, "network/CORS blocked");
+        }
+      }
       throw error;
+    } finally {
+      window.clearTimeout(timeout);
     }
   }
 

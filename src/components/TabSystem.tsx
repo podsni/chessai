@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Copy, Pencil, Plus, Sparkles, Trash2, X, XCircle } from "lucide-react";
 import { ChessBot } from "./ChessBot";
 import { useTabsStore } from "../stores/useTabsStore";
 
@@ -172,15 +173,15 @@ export function TabSystem() {
       className="min-h-screen flex flex-col"
       style={{ background: "var(--bg-primary)" }}
     >
-      <div className="bg-gray-800 border-b border-gray-700 px-2 md:px-4 py-2 shadow-lg">
-        <div className="flex items-center gap-1 md:gap-2 overflow-x-auto tab-container scrollbar-hide">
+      <div className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur border-b border-slate-700/80 px-2 md:px-4 py-2 shadow-lg">
+        <div className="flex items-center gap-1 md:gap-2 overflow-x-auto tab-container scrollbar-hide pb-1">
           {tabs.map((tab) => (
             <div
               key={tab.id}
-              className={`tab-item relative flex items-center gap-1 md:gap-2 px-2 md:px-3 py-2 md:py-2 rounded-t-lg cursor-pointer group min-w-fit whitespace-nowrap touch-manipulation ${
+              className={`tab-item relative flex items-center gap-1.5 px-2.5 md:px-3 py-2 rounded-xl cursor-pointer group min-w-[92px] max-w-[148px] whitespace-nowrap touch-manipulation transition-all duration-150 ${
                 tab.id === activeTabId
-                  ? "tab-item active bg-gray-700 text-white border-b-2 border-blue-500 shadow-md"
-                  : "bg-gray-600 text-gray-300 hover:bg-gray-500"
+                  ? "tab-item active bg-slate-700 text-white border border-blue-500/70 shadow-[0_0_0_1px_rgba(59,130,246,0.22)]"
+                  : "bg-slate-700/70 text-slate-300 border border-slate-600/70 hover:bg-slate-600/80"
               }`}
               onClick={() => {
                 if (tab.id !== activeTabId) {
@@ -195,7 +196,6 @@ export function TabSystem() {
                   tabId: tab.id,
                 });
               }}
-              style={{ minWidth: "80px", maxWidth: "160px" }}
             >
               <span className="text-xs md:text-sm font-medium truncate flex-1">
                 {tab.name}
@@ -206,20 +206,10 @@ export function TabSystem() {
                     e.stopPropagation();
                     closeTab(tab.id);
                   }}
-                  className="tab-close-button text-gray-400 hover:text-red-400 transition-all duration-200 p-1 rounded-full hover:bg-red-500/20 touch-manipulation ml-1"
+                  className="tab-close-button text-slate-400 hover:text-red-300 transition-all duration-150 p-1 rounded-full hover:bg-red-500/20 touch-manipulation"
                   title="Close tab"
                 >
-                  <svg
-                    className="w-3 h-3 md:w-4 md:h-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
 
@@ -230,10 +220,10 @@ export function TabSystem() {
                       e.stopPropagation();
                       closeTab(tab.id);
                     }}
-                    className="w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs touch-manipulation shadow-lg"
+                    className="w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center touch-manipulation shadow-lg"
                     title="Close tab"
                   >
-                    ×
+                    <X className="w-3 h-3" />
                   </button>
                 </div>
               )}
@@ -242,61 +232,29 @@ export function TabSystem() {
 
           <button
             onClick={createNewTab}
-            className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 bg-gray-600 hover:bg-gray-500 text-gray-300 rounded-lg transition-colors ml-1 md:ml-2 touch-manipulation shadow-md hover:shadow-lg"
+            className="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl transition-colors ml-1 md:ml-2 touch-manipulation shadow-md"
             title="New tab"
           >
-            <svg
-              className="w-4 h-4 md:w-5 md:h-5"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                clipRule="evenodd"
-              />
-            </svg>
+            <Plus className="w-4 h-4 md:w-5 md:h-5" />
           </button>
 
           {activeTab && (
             <button
               onClick={() => duplicateTab(activeTab.id)}
-              className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 bg-blue-700 hover:bg-blue-600 text-white rounded-lg transition-colors ml-1 touch-manipulation shadow-md hover:shadow-lg"
+              className="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 bg-blue-700 hover:bg-blue-600 text-white rounded-xl transition-colors ml-1 touch-manipulation shadow-md"
               title="Copy current tab"
             >
-              <svg
-                className="w-4 h-4 md:w-5 md:h-5"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v1h-2V4H7v8h1v2H7a2 2 0 01-2-2V4z" />
-                <path d="M9 8a2 2 0 012-2h4a2 2 0 012 2v8a2 2 0 01-2 2h-4a2 2 0 01-2-2V8zm2 0v8h4V8h-4z" />
-              </svg>
+              <Copy className="w-4 h-4 md:w-5 md:h-5" />
             </button>
           )}
 
           {tabs.length > 1 && (
             <button
               onClick={closeAllTabs}
-              className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors ml-1 touch-manipulation shadow-md hover:shadow-lg"
+              className="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 bg-red-600 hover:bg-red-500 text-white rounded-xl transition-colors ml-1 touch-manipulation shadow-md"
               title="Close all tabs"
             >
-              <svg
-                className="w-4 h-4 md:w-5 md:h-5"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"
-                  clipRule="evenodd"
-                />
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              <XCircle className="w-4 h-4 md:w-5 md:h-5" />
             </button>
           )}
         </div>
@@ -344,7 +302,7 @@ export function TabSystem() {
             }}
             className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
           >
-            <span className="text-red-400">✕</span>
+            <X className="w-4 h-4 text-red-400" />
             Close Tab
           </button>
 
@@ -356,7 +314,7 @@ export function TabSystem() {
               }}
               className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
             >
-              <span className="text-orange-400">⚡</span>
+              <Sparkles className="w-4 h-4 text-orange-400" />
               Close Other Tabs
             </button>
           )}
@@ -368,7 +326,7 @@ export function TabSystem() {
             }}
             className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
           >
-            <span className="text-blue-300">📑</span>
+            <Copy className="w-4 h-4 text-blue-300" />
             Copy Tab
           </button>
 
@@ -380,7 +338,7 @@ export function TabSystem() {
               }}
               className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
             >
-              <span className="text-red-500">🗑️</span>
+              <Trash2 className="w-4 h-4 text-red-500" />
               Close All Tabs
             </button>
           )}
@@ -400,7 +358,7 @@ export function TabSystem() {
             }}
             className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
           >
-            <span className="text-blue-400">✏️</span>
+            <Pencil className="w-4 h-4 text-blue-400" />
             Rename Tab
           </button>
         </div>

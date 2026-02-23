@@ -48,10 +48,26 @@ export default defineConfig({
     port: 5173,
     host: true,
     allowedHosts: ["vite.dwx.my.id"],
+    proxy: {
+      "/api/stockfish": {
+        target: "https://stockfish.online",
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api\/stockfish/, "/api/s/v2.php"),
+      },
+    },
   },
   preview: {
     port: 4173,
     host: true,
+    proxy: {
+      "/api/stockfish": {
+        target: "https://stockfish.online",
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api\/stockfish/, "/api/s/v2.php"),
+      },
+    },
   },
   // Performance optimizations
   optimizeDeps: {

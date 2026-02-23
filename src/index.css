@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+/* Tailwind v4 design tokens (CSS-first config) */
+@theme {
+  --color-background: #171613;
+  --color-surface: #201d19;
+  --color-foreground: #f5f1e8;
+  --color-muted: #cfc9bb;
+  --color-border: rgba(170, 145, 97, 0.22);
+  --color-primary: #6e9f3d;
+  --color-primary-foreground: #f8fcea;
+  --radius-card: 14px;
+  --radius-button: 10px;
+}
+
+@layer base {
+  body {
+    @apply antialiased;
+  }
+}
+
 *,
 *::before,
 *::after {

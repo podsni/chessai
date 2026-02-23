@@ -1,6 +1,6 @@
 import { Chess, Square } from "chess.js";
 import { Chessboard } from "react-chessboard";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 interface MiniBoardProps {
   fen: string;
@@ -91,16 +91,51 @@ export function MiniBoard({
   };
 
   // Create arrows for the best move
-  const customArrows = bestMove
-    ? (() => {
-        if (bestMove.length >= 4) {
-          const from = bestMove.substring(0, 2) as Square;
-          const to = bestMove.substring(2, 4) as Square;
-          return [[from, to]] as [Square, Square][];
-        }
-        return [];
-      })()
-    : [];
+  const customArrows = useMemo(
+    () =>
+      bestMove
+        ? (() => {
+            if (bestMove.length >= 4) {
+              const from = bestMove.substring(0, 2) as Square;
+              const to = bestMove.substring(2, 4) as Square;
+              return [
+                {
+                  startSquare: from,
+                  endSquare: to,
+                  color: "#7fb069",
+                },
+              ];
+            }
+            return [];
+          })()
+        : [],
+    [bestMove],
+  );
+
+  const chessboardOptions = useMemo(
+    () => ({
+      id: `mini-board-${title.replace(/\s+/g, "-").toLowerCase()}`,
+      position: predictedFen,
+      boardOrientation,
+      allowDragging: false,
+      showNotation: false,
+      arrows: customArrows,
+      allowDrawingArrows: false,
+      boardStyle: {
+        width: boardSize,
+        borderRadius: boardSize < 160 ? "3px" : "4px",
+        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
+        border: "1px solid #8b7355",
+      },
+      darkSquareStyle: {
+        backgroundColor: "#b58863",
+      },
+      lightSquareStyle: {
+        backgroundColor: "#f0d9b5",
+      },
+    }),
+    [boardOrientation, boardSize, customArrows, predictedFen, title],
+  );
 
   return (
     <div className="mini-board-container w-full flex justify-center">
@@ -117,27 +152,7 @@ export function MiniBoard({
 
         {/* Mini Chess Board */}
         <div className="relative flex justify-center">
-          <Chessboard
-            id={`mini-board-${title.replace(/\s+/g, "-").toLowerCase()}`}
-            position={predictedFen}
-            boardWidth={boardSize}
-            boardOrientation={boardOrientation}
-            arePiecesDraggable={false}
-            showBoardNotation={false}
-            customArrows={customArrows}
-            customArrowColor="#7fb069"
-            customBoardStyle={{
-              borderRadius: boardSize < 160 ? "3px" : "4px",
-              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
-              border: "1px solid #8b7355",
-            }}
-            customDarkSquareStyle={{
-              backgroundColor: "#b58863",
-            }}
-            customLightSquareStyle={{
-              backgroundColor: "#f0d9b5",
-            }}
-          />
+          <Chessboard options={chessboardOptions} />
         </div>
 
         {/* Move Information */}

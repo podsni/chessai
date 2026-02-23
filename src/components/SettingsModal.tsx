@@ -3,6 +3,7 @@ import { soundManager } from "../services/soundManager";
 import { hapticManager } from "../services/hapticManager";
 import { gameStorage } from "../services/gameStorage";
 import type { GameSettings } from "../types/chess";
+import { getUiDepthLimit } from "../utils/engineConstraints";
 
 type SettingsModalState = GameSettings & {
   soundEnabled: boolean;
@@ -32,12 +33,17 @@ export function SettingsModal({
   });
 
   if (!isOpen) return null;
+  const uiDepthLimit = getUiDepthLimit(localSettings);
 
   const handleSettingChange = <K extends keyof SettingsModalState>(
     key: K,
     value: SettingsModalState[K],
   ) => {
     const newSettings: SettingsModalState = { ...localSettings, [key]: value };
+    const depthLimit = getUiDepthLimit(newSettings);
+    if (newSettings.aiDepth > depthLimit) {
+      newSettings.aiDepth = depthLimit;
+    }
     setLocalSettings(newSettings);
 
     // Apply immediately for feedback settings
@@ -62,7 +68,13 @@ export function SettingsModal({
       hapticEnabled: localSettings.hapticEnabled,
       theme: "dark",
       boardOrientation: localSettings.boardOrientation,
+      aiEngine: localSettings.aiEngine,
+      analysisEngineMode: localSettings.analysisEngineMode,
+      battleEnabled: localSettings.battleEnabled,
+      battleOpponentEngine: localSettings.battleOpponentEngine,
       showAnalysisArrows: localSettings.showAnalysisArrows,
+      wdlPolicyArrows: localSettings.wdlPolicyArrows,
+      wdlShowAllArrowsDefault: localSettings.wdlShowAllArrowsDefault,
       autoAnalysis: localSettings.autoAnalysis,
       aiDepth: localSettings.aiDepth,
     });
@@ -74,7 +86,13 @@ export function SettingsModal({
       humanColor: localSettings.humanColor,
       aiColor: localSettings.aiColor,
       aiDepth: localSettings.aiDepth,
+      aiEngine: localSettings.aiEngine,
+      analysisEngineMode: localSettings.analysisEngineMode,
+      battleEnabled: localSettings.battleEnabled,
+      battleOpponentEngine: localSettings.battleOpponentEngine,
       showAnalysisArrows: localSettings.showAnalysisArrows,
+      wdlPolicyArrows: localSettings.wdlPolicyArrows,
+      wdlShowAllArrowsDefault: localSettings.wdlShowAllArrowsDefault,
       autoAnalysis: localSettings.autoAnalysis,
       analysisMode: localSettings.analysisMode,
     });
@@ -200,6 +218,34 @@ export function SettingsModal({
                   className="w-4 h-4 text-blue-600 rounded"
                 />
               </div>
+
+              <div className="flex items-center justify-between">
+                <label className="text-gray-300">WDL Policy Arrows</label>
+                <input
+                  type="checkbox"
+                  checked={localSettings.wdlPolicyArrows}
+                  onChange={(e) =>
+                    handleSettingChange("wdlPolicyArrows", e.target.checked)
+                  }
+                  className="w-4 h-4 text-blue-600 rounded"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-gray-300">
+                  Default Show All WDL Arrows
+                </label>
+                <input
+                  type="checkbox"
+                  checked={localSettings.wdlShowAllArrowsDefault}
+                  onChange={(e) =>
+                    handleSettingChange(
+                      "wdlShowAllArrowsDefault",
+                      e.target.checked,
+                    )
+                  }
+                  className="w-4 h-4 text-blue-600 rounded"
+                />
+              </div>
             </div>
           </div>
 
@@ -215,7 +261,7 @@ export function SettingsModal({
               <input
                 type="range"
                 min="1"
-                max="15"
+                max={uiDepthLimit}
                 value={localSettings.aiDepth}
                 onChange={(e) =>
                   handleSettingChange("aiDepth", parseInt(e.target.value))
@@ -225,7 +271,7 @@ export function SettingsModal({
               <div className="flex justify-between text-xs text-gray-400 mt-1">
                 <span>Fast (1)</span>
                 <span>Balanced (10)</span>
-                <span>Strong (15)</span>
+                <span>Strong ({uiDepthLimit})</span>
               </div>
             </div>
           </div>
