@@ -24,24 +24,9 @@ export function FenDisplay({
 
       // Reset copied state after 2 seconds
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error("Failed to copy FEN:", error);
-      soundManager.playError();
-      hapticManager.errorPattern();
-
-      // Fallback for older browsers
-      try {
-        const textArea = document.createElement("textarea");
-        textArea.value = fen;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textArea);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } catch {
-        alert("Copy failed. Please copy manually: " + fen);
-      }
+    } catch {
+      // Clipboard API not available - FEN is visible in the UI for manual copy
+      console.warn("Clipboard API not available");
     }
   };
 

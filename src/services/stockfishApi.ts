@@ -83,6 +83,7 @@ export class StockfishAPI {
         mate: data.mate ?? undefined,
         bestmove: data.bestmove ?? undefined, // Keep original field name
         continuation: data.continuation ?? undefined,
+        winChance: data.winChance ?? undefined,
       };
     } catch (error) {
       if (error instanceof Error) {

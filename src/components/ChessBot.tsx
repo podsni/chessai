@@ -5,6 +5,7 @@ import { FenDisplay } from "./FenDisplay";
 import { AnalysisTimelineChart } from "./AnalysisTimelineChart";
 import { MoveNotation } from "./MoveNotation";
 import { PgnLoadModal } from "./PgnLoadModal";
+import { SavedGamesModal } from "./SavedGamesModal";
 import { EvaluationBar } from "./EvaluationBar";
 import { useChessBot } from "../hooks/useChessBot";
 import { useState, useEffect, useMemo } from "react";
@@ -16,6 +17,7 @@ import {
   Lightbulb,
   LocateFixed,
   RotateCcw,
+  Save,
   ScanSearch,
   Settings,
   Smartphone,
@@ -42,6 +44,7 @@ export function ChessBot({
   const [isMobile, setIsMobile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showPgnModal, setShowPgnModal] = useState(false);
+  const [showSavedGames, setShowSavedGames] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [tempName, setTempName] = useState("");
   const [selectedWdlMove, setSelectedWdlMove] = useState<string | null>(null);
@@ -267,6 +270,14 @@ export function ChessBot({
               >
                 <FileText className="w-4 h-4" />
                 <span>PGN</span>
+              </button>
+              <button
+                onClick={() => setShowSavedGames(true)}
+                className="chess-button secondary header-action-btn h-10 px-3 text-xs md:text-sm touch-manipulation inline-flex items-center gap-1.5"
+                title="Saved Games"
+              >
+                <Save className="w-4 h-4" />
+                <span className="hidden sm:inline">Saved</span>
               </button>
               <button
                 onClick={() => setShowSettings(true)}
@@ -653,6 +664,13 @@ export function ChessBot({
         isOpen={showPgnModal}
         onClose={() => setShowPgnModal(false)}
         onLoadGame={handleLoadPGN}
+      />
+
+      {/* Saved Games Modal */}
+      <SavedGamesModal
+        isOpen={showSavedGames}
+        onClose={() => setShowSavedGames(false)}
+        onLoadGame={handleLoadFen}
       />
     </div>
   );

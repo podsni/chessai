@@ -1,11 +1,5 @@
 const CACHE_NAME = "chessbot-v1";
-const urlsToCache = [
-  "/",
-  "/index.html",
-  "/static/js/bundle.js",
-  "/static/css/main.css",
-  // Add other static assets as needed
-];
+const urlsToCache = ["/", "/index.html"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -16,14 +10,39 @@ self.addEventListener("install", (event) => {
   );
 });
 
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((cacheNames) =>
+        Promise.all(
+          cacheNames
+            .filter((name) => name !== CACHE_NAME)
+            .map((name) => caches.delete(name)),
+        ),
+      ),
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      // Return cached version or fetch from network
-      if (response) {
+    fetch(event.request)
+      .then((response) => {
+        // Only cache successful same-origin GET responses
+        if (
+          !response ||
+          response.status !== 200 ||
+          response.type !== "basic" ||
+          event.request.method !== "GET"
+        ) {
+          return response;
+        }
+        const responseToCache = response.clone();
+        caches
+          .open(CACHE_NAME)
+          .then((cache) => cache.put(event.request, responseToCache));
         return response;
-      }
-      return fetch(event.request);
-    }),
+      })
+      .catch(() => caches.match(event.request)),
   );
 });
