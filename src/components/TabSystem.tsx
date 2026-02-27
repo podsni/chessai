@@ -25,13 +25,15 @@ export function TabSystem() {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hydratedRef = useRef(false);
   const TABS_STORAGE_KEY = "chessbot-tabs";
+  const ACTIVE_TAB_KEY = "chessbot-active-tab";
 
   useEffect(() => {
     if (hydratedRef.current) return;
     try {
       const savedTabs = localStorage.getItem(TABS_STORAGE_KEY);
+      const savedActiveTabId = localStorage.getItem(ACTIVE_TAB_KEY) ?? undefined;
       if (savedTabs) {
-        hydrateTabs(JSON.parse(savedTabs));
+        hydrateTabs(JSON.parse(savedTabs), savedActiveTabId);
       } else {
         createNewTab();
       }
@@ -54,6 +56,9 @@ export function TabSystem() {
     saveTimeoutRef.current = setTimeout(() => {
       try {
         localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(tabs));
+        if (activeTabId) {
+          localStorage.setItem(ACTIVE_TAB_KEY, activeTabId);
+        }
       } catch (error) {
         console.error("Error saving tabs:", error);
       }
@@ -64,7 +69,7 @@ export function TabSystem() {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [tabs]);
+  }, [tabs, activeTabId]);
 
   useEffect(() => {
     const handleClickOutside = () => setContextMenu(null);

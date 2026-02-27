@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Chessboard } from "react-chessboard";
 import { Chess, Square } from "chess.js";
 import { usePuzzle } from "../hooks/usePuzzle";
@@ -32,8 +32,63 @@ export function PuzzleMode({ boardTheme = "classic" }: PuzzleModeProps) {
     showSolution,
     loadPuzzle,
     handleSquareClick,
+    handlePieceDrop,
     handleRevealSolution,
   } = usePuzzle();
+
+  // Responsive board sizing
+  const boardContainerRef = useRef<HTMLDivElement | null>(null);
+  const [boardSize, setBoardSize] = useState(360);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+  useEffect(() => {
+    const checkTouch = () =>
+      "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    setIsTouchDevice(checkTouch());
+  }, []);
+
+  useEffect(() => {
+    const calculateSize = () => {
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+      const containerWidth =
+        boardContainerRef.current?.clientWidth || screenWidth;
+      const isLandscape = screenWidth > screenHeight;
+      const availableWidth = Math.max(200, containerWidth - 16);
+
+      let idealSize = 400;
+
+      if (screenWidth < 480) {
+        idealSize = isLandscape
+          ? Math.min(screenHeight * 0.78, screenWidth * 0.44, 340)
+          : Math.min(screenWidth * 0.86, 330);
+      } else if (screenWidth < 768) {
+        idealSize = isLandscape
+          ? Math.min(screenHeight * 0.74, screenWidth * 0.46, 400)
+          : Math.min(screenWidth * 0.78, 390);
+      } else if (screenWidth < 1024) {
+        idealSize = Math.min(screenWidth * 0.46, screenHeight * 0.6, 480);
+      } else {
+        idealSize = Math.min(screenWidth * 0.36, 520);
+      }
+
+      return Math.floor(Math.min(idealSize, availableWidth));
+    };
+
+    const update = () => setBoardSize(calculateSize());
+    update();
+
+    let ro: ResizeObserver | null = null;
+    if (boardContainerRef.current && "ResizeObserver" in window) {
+      ro = new ResizeObserver(update);
+      ro.observe(boardContainerRef.current);
+    }
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      ro?.disconnect();
+    };
+  }, []);
 
   // Auto-load a puzzle on mount
   useEffect(() => {
@@ -103,8 +158,46 @@ export function PuzzleMode({ boardTheme = "classic" }: PuzzleModeProps) {
       ? Math.round((moveIndex / puzzle.solution.length) * 100)
       : 0;
 
+  // Mobile board style
+  const boardStyle = useMemo<React.CSSProperties>(
+    () => ({
+      borderRadius: boardSize < 340 ? "6px" : "8px",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+      border: "2px solid #8b7355",
+      width: boardSize,
+      ...(isTouchDevice && {
+        touchAction: "none" as const,
+        userSelect: "none" as const,
+        WebkitUserSelect: "none" as const,
+        WebkitTouchCallout: "none" as const,
+        WebkitTapHighlightColor: "transparent",
+      }),
+    }),
+    [boardSize, isTouchDevice],
+  );
+
+  const notationFontSize =
+    boardSize < 300 ? "7px" : boardSize < 380 ? "9px" : "11px";
+
+  // Drag-and-drop handler wrapper
+  const onPieceDrop = useMemo(
+    () =>
+      ({
+        sourceSquare,
+        targetSquare,
+      }: {
+        sourceSquare: string;
+        targetSquare: string | null;
+      }) => {
+        if (!targetSquare) return false;
+        if (sourceSquare === targetSquare) return false;
+        return handlePieceDrop(sourceSquare as Square, targetSquare as Square);
+      },
+    [handlePieceDrop],
+  );
+
   return (
-    <div className="flex flex-col items-center gap-4 w-full max-w-lg mx-auto py-4">
+    <div className="flex flex-col items-center gap-3 w-full max-w-xl mx-auto py-3">
       {/* Header */}
       <div className="flex items-center gap-3 w-full">
         <Brain className="w-6 h-6 text-purple-400 flex-shrink-0" />
@@ -124,6 +217,16 @@ export function PuzzleMode({ boardTheme = "classic" }: PuzzleModeProps) {
         )}
       </div>
 
+      {/* Mobile touch hint */}
+      {isTouchDevice && status === "playing" && (
+        <div className="w-full bg-blue-950/40 border border-blue-700/40 rounded-lg px-3 py-2 text-xs text-blue-300 flex items-center gap-2">
+          <span>📱</span>
+          <span>
+            <strong>Touch:</strong> Tap piece → tap destination, or drag & drop
+          </span>
+        </div>
+      )}
+
       {/* Status Banner */}
       {status === "loading" && (
         <div className="flex items-center gap-2 text-gray-300 text-sm">
@@ -142,7 +245,7 @@ export function PuzzleMode({ boardTheme = "classic" }: PuzzleModeProps) {
       {wrongMove && status === "playing" && (
         <div className="flex items-center gap-2 text-red-400 text-sm bg-red-900/30 border border-red-700/50 rounded-lg px-4 py-2 w-full justify-center">
           <XCircle className="w-4 h-4" />
-          That's not the best move. Try again!
+          That&apos;s not the best move. Try again!
         </div>
       )}
 
@@ -179,27 +282,78 @@ export function PuzzleMode({ boardTheme = "classic" }: PuzzleModeProps) {
             </div>
           )}
 
-          <div className="relative">
-            <Chessboard
-              options={{
-                id: "puzzle-board",
-                position: currentFen,
-                boardOrientation: isFlipped ? "black" : "white",
-                onSquareClick: ({ square }: { square: string }) =>
-                  handleSquareClick(square as Square),
-                allowDragging: false,
-                squareStyles: customSquareStyles,
-                arrows: solutionArrows,
-                darkSquareStyle: { backgroundColor: themeColors.dark },
-                lightSquareStyle: { backgroundColor: themeColors.light },
-                boardStyle: {
-                  borderRadius: "8px",
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-                  border: "2px solid #8b7355",
-                },
-              }}
-            />
+          <div
+            ref={boardContainerRef}
+            className="w-full flex justify-center"
+          >
+            <div
+              className="relative"
+              style={{ width: `${boardSize}px`, height: `${boardSize}px` }}
+            >
+              <Chessboard
+                options={{
+                  id: "puzzle-board",
+                  position: currentFen,
+                  boardOrientation: isFlipped ? "black" : "white",
+                  onSquareClick: ({ square }: { square: string }) =>
+                    handleSquareClick(square as Square),
+                  onPieceClick: ({
+                    square,
+                  }: {
+                    square: string | null;
+                    piece: { pieceType: string };
+                  }) => {
+                    if (isTouchDevice && square) {
+                      handleSquareClick(square as Square);
+                    }
+                  },
+                  onPieceDrop: onPieceDrop,
+                  allowDragging: status === "playing",
+                  canDragPiece: ({ piece: _piece }: { piece: { pieceType: string } }) => {
+                    if (status !== "playing") return false;
+                    // Allow dragging pieces of the current player's color
+                    return true; // chess.js will validate on drop
+                  },
+                  squareStyles: customSquareStyles,
+                  arrows: solutionArrows,
+                  darkSquareStyle: { backgroundColor: themeColors.dark },
+                  lightSquareStyle: { backgroundColor: themeColors.light },
+                  boardStyle: boardStyle,
+                  animationDurationInMs: isTouchDevice ? 150 : 200,
+                  showNotation: boardSize > 280,
+                  allowDragOffBoard: false,
+                  allowDrawingArrows: false,
+                  darkSquareNotationStyle: {
+                    fontSize: notationFontSize,
+                    fontWeight: "600",
+                    color: "#5a5a5a",
+                  },
+                  lightSquareNotationStyle: {
+                    fontSize: notationFontSize,
+                    fontWeight: "600",
+                    color: "#5a5a5a",
+                  },
+                  alphaNotationStyle: {
+                    fontSize: notationFontSize,
+                    fontWeight: "600",
+                    color: "#5a5a5a",
+                  },
+                  numericNotationStyle: {
+                    fontSize: notationFontSize,
+                    fontWeight: "600",
+                    color: "#5a5a5a",
+                  },
+                }}
+              />
+            </div>
           </div>
+
+          {/* Selected square indicator for mobile */}
+          {isTouchDevice && selectedSquare && status === "playing" && (
+            <div className="bg-yellow-500/20 border border-yellow-500/40 rounded-lg px-3 py-1.5 text-xs text-yellow-300 font-medium animate-pulse">
+              ✨ {selectedSquare} selected — tap destination to move
+            </div>
+          )}
 
           {/* Themes */}
           {puzzle && puzzle.themes.length > 0 && (
@@ -222,7 +376,7 @@ export function PuzzleMode({ boardTheme = "classic" }: PuzzleModeProps) {
         <button
           onClick={() => void loadPuzzle()}
           disabled={status === "loading"}
-          className="chess-button secondary flex-1 flex items-center justify-center gap-1.5 text-sm min-h-[44px]"
+          className="chess-button secondary flex-1 flex items-center justify-center gap-1.5 text-sm min-h-[44px] touch-manipulation"
         >
           {status === "loading" ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -235,7 +389,7 @@ export function PuzzleMode({ boardTheme = "classic" }: PuzzleModeProps) {
         {status === "playing" && !showSolution && (
           <button
             onClick={handleRevealSolution}
-            className="chess-button secondary flex items-center gap-1.5 text-sm min-h-[44px] px-4"
+            className="chess-button secondary flex items-center gap-1.5 text-sm min-h-[44px] px-4 touch-manipulation"
           >
             <Eye className="w-4 h-4" />
             <span className="hidden sm:inline">Show Hint</span>
@@ -253,7 +407,7 @@ export function PuzzleMode({ boardTheme = "classic" }: PuzzleModeProps) {
           </p>
           <button
             onClick={() => void loadPuzzle()}
-            className="chess-button mt-4 flex items-center gap-2 mx-auto"
+            className="chess-button mt-4 flex items-center gap-2 mx-auto touch-manipulation"
           >
             <RefreshCw className="w-4 h-4" />
             Load Puzzle

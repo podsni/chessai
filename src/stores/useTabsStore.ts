@@ -14,7 +14,7 @@ interface TabsStore {
   activeTabId: string;
   setActiveTabId: (tabId: string) => void;
   createNewTab: () => string;
-  hydrateTabs: (tabs: ChessTab[]) => void;
+  hydrateTabs: (tabs: ChessTab[], activeTabId?: string) => void;
   closeTab: (tabId: string) => void;
   closeOtherTabs: (keepTabId: string) => void;
   closeAllTabs: () => void;
@@ -119,11 +119,15 @@ export const useTabsStore = create<TabsStore>((set, get) => ({
     return newId;
   },
 
-  hydrateTabs: (tabs) => {
+  hydrateTabs: (tabs, activeTabId) => {
     const safeTabs = Array.isArray(tabs) ? tabs : [];
+    const resolvedActiveId =
+      activeTabId && safeTabs.some((t) => t.id === activeTabId)
+        ? activeTabId
+        : safeTabs[0]?.id || "";
     set({
       tabs: safeTabs,
-      activeTabId: safeTabs[0]?.id || "",
+      activeTabId: resolvedActiveId,
     });
   },
 
