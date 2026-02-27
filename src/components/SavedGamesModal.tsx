@@ -15,6 +15,9 @@ export function SavedGamesModal({
   const [savedGames, setSavedGames] = useState<SavedGame[]>(() =>
     gameStorage.getSavedGames(),
   );
+  const [autoSaved, setAutoSaved] = useState(() =>
+    gameStorage.getAutoSavedGame(),
+  );
   const [showExportData, setShowExportData] = useState(false);
   const [exportData, setExportData] = useState("");
   const [showImport, setShowImport] = useState(false);
@@ -208,48 +211,45 @@ export function SavedGamesModal({
           <>
             <div className="p-4 md:p-6">
               {/* Auto-saved game */}
-              {(() => {
-                const autoSaved = gameStorage.getAutoSavedGame();
-                if (autoSaved) {
-                  return (
-                    <div className="mb-6">
-                      <h3 className="text-lg font-medium text-white mb-3">
-                        🔄 Auto-saved Game
-                      </h3>
-                      <div className="bg-gray-700 rounded-lg p-4 hover:bg-gray-650 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-medium text-white">
-                              {autoSaved.name}
-                            </h4>
-                            <p className="text-gray-300 text-sm">
-                              {formatGameInfo(autoSaved)}
-                            </p>
-                            <p className="text-gray-400 text-xs">
-                              {formatDate(autoSaved.timestamp)}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleLoadGame(autoSaved)}
-                              className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                            >
-                              Load
-                            </button>
-                            <button
-                              onClick={() => gameStorage.clearAutoSave()}
-                              className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-                            >
-                              Clear
-                            </button>
-                          </div>
-                        </div>
+              {autoSaved && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-medium text-white mb-3">
+                    🔄 Auto-saved Game
+                  </h3>
+                  <div className="bg-gray-700 rounded-lg p-4 hover:bg-gray-650 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-white">
+                          {autoSaved.name}
+                        </h4>
+                        <p className="text-gray-300 text-sm">
+                          {formatGameInfo(autoSaved)}
+                        </p>
+                        <p className="text-gray-400 text-xs">
+                          {formatDate(autoSaved.timestamp)}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleLoadGame(autoSaved)}
+                          className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                        >
+                          Load
+                        </button>
+                        <button
+                          onClick={() => {
+                            gameStorage.clearAutoSave();
+                            setAutoSaved(null);
+                          }}
+                          className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                        >
+                          Clear
+                        </button>
                       </div>
                     </div>
-                  );
-                }
-                return null;
-              })()}
+                  </div>
+                </div>
+              )}
 
               {/* Manually saved games */}
               <div className="flex items-center justify-between mb-4">

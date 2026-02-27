@@ -1716,18 +1716,8 @@ export const useChessBot = (
     }));
     updateGameState();
 
-    // If playing as black in human vs AI, let AI (white) make first move
-    if (settings.mode === "human-vs-ai") {
-      setTimeout(() => handleBotMove(), 500);
-    }
-  }, [
-    cancelPgnAnalysis,
-    chess,
-    clearSelection,
-    updateGameState,
-    settings.mode,
-    handleBotMove,
-  ]);
+    // Auto-move useEffect handles triggering handleBotMove when it's the AI's turn
+  }, [cancelPgnAnalysis, chess, clearSelection, updateGameState]);
 
   const handleUndo = useCallback(() => {
     cancelPgnAnalysis();
@@ -1866,10 +1856,7 @@ export const useChessBot = (
   }, []);
 
   const handleReplayLast = useCallback(() => {
-    setReplayIndex((prev) => {
-      const last = moveHistory.length;
-      return prev === null ? last : last;
-    });
+    setReplayIndex(moveHistory.length);
   }, [moveHistory.length]);
 
   const handleReplayPrev = useCallback(() => {
@@ -1883,7 +1870,7 @@ export const useChessBot = (
     setReplayIndex((prev) => {
       if (prev === null) return null;
       const next = prev + 1;
-      if (next >= moveHistory.length) return null; // exit replay at last move
+      if (next > moveHistory.length) return null; // exit replay past last move
       return next;
     });
   }, [moveHistory.length]);
@@ -1904,19 +1891,15 @@ export const useChessBot = (
         chess.load(newChess.fen());
 
         // Create move history from the game moves
-        const moveHistory = gameInfo.moves.map((move, index) => {
-          // Try to apply the move to get the SAN notation
-          const tempChess = new Chess();
-          for (let i = 0; i <= index; i++) {
-            try {
-              const moveResult = tempChess.move(gameInfo.moves[i]);
-              if (i === index && moveResult) {
-                return moveResult.san;
-              }
-            } catch {
-              // If move fails, just use the original notation
-              return gameInfo.moves[i];
+        const tempChess = new Chess();
+        const moveHistory = gameInfo.moves.map((move) => {
+          try {
+            const moveResult = tempChess.move(move);
+            if (moveResult) {
+              return moveResult.san;
             }
+          } catch {
+            // If move fails, just use the original notation
           }
           return move;
         });

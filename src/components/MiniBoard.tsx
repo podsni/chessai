@@ -64,20 +64,20 @@ export function MiniBoard({
   }, [size]);
 
   // Create a temporary chess instance to show the predicted position
-  const tempChess = new Chess(fen);
-  let predictedFen = fen;
-
-  // If we have a best move, apply it to show the predicted position
-  if (bestMove) {
-    try {
-      const move = tempChess.move(bestMove);
-      if (move) {
-        predictedFen = tempChess.fen();
+  const predictedFen = useMemo(() => {
+    const tempChess = new Chess(fen);
+    if (bestMove) {
+      try {
+        const move = tempChess.move(bestMove);
+        if (move) {
+          return tempChess.fen();
+        }
+      } catch (error) {
+        console.error("Error applying best move:", error);
       }
-    } catch (error) {
-      console.error("Error applying best move:", error);
     }
-  }
+    return fen;
+  }, [fen, bestMove]);
 
   const formatEvaluation = () => {
     if (mate !== null && mate !== undefined) {

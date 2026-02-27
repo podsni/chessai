@@ -31,7 +31,7 @@ export class PGNParser {
       const gameTexts = this.splitIntoGames(trimmedText);
 
       for (const gameText of gameTexts) {
-        const game = this.parseeSingleGame(gameText);
+        const game = this.parseSingleGame(gameText);
         if (game) {
           games.push(game);
         }
@@ -90,7 +90,7 @@ export class PGNParser {
   /**
    * Parse a single game from PGN text
    */
-  private static parseeSingleGame(gameText: string): PGNGameInfo | null {
+  private static parseSingleGame(gameText: string): PGNGameInfo | null {
     try {
       const lines = gameText
         .split("\n")

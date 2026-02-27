@@ -304,7 +304,6 @@ export function ChessBoard({
       arrows: customArrows,
       boardStyle: {
         ...mobileBoardStyle,
-        width: boardSize,
       },
       animationDurationInMs: isTouchDevice ? 150 : 200,
       allowDragging: arePiecesDraggable,

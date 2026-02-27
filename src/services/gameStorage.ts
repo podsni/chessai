@@ -290,7 +290,10 @@ class GameStorage {
   // Storage space management
   getStorageInfo(): { used: number; available: number; percentage: number } {
     try {
-      const totalSize = JSON.stringify(localStorage).length;
+      const totalSize = Object.keys(localStorage).reduce(
+        (sum, key) => sum + (localStorage.getItem(key)?.length ?? 0),
+        0,
+      );
       const availableSize = 5 * 1024 * 1024; // Roughly 5MB limit for localStorage
 
       return {
