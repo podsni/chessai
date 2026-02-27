@@ -28,6 +28,7 @@ interface GameSettings {
   wdlShowAllArrowsDefault: boolean;
   autoAnalysis: boolean;
   aiDepth: number;
+  boardTheme: "classic" | "blue" | "green" | "dark" | "purple" | "red";
 }
 
 class GameStorage {
@@ -131,6 +132,7 @@ class GameStorage {
         wdlShowAllArrowsDefault: true,
         autoAnalysis: false,
         aiDepth: 10,
+        boardTheme: "classic",
       };
 
       return settingsJson
@@ -154,6 +156,7 @@ class GameStorage {
         wdlShowAllArrowsDefault: true,
         autoAnalysis: false,
         aiDepth: 10,
+        boardTheme: "classic",
       };
     }
   }

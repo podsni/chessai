@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { gameStorage, type SavedGame } from "../services/gameStorage";
 
 interface SavedGamesModalProps {
@@ -17,6 +17,13 @@ export function SavedGamesModal({
   );
   const [showExportData, setShowExportData] = useState(false);
   const [exportData, setExportData] = useState("");
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importMessage, setImportMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
@@ -39,8 +46,44 @@ export function SavedGamesModal({
   };
 
   const handleCopyExportData = () => {
-    navigator.clipboard.writeText(exportData);
-    alert("Export data copied to clipboard!");
+    navigator.clipboard
+      .writeText(exportData)
+      .catch(() => console.warn("Clipboard unavailable"));
+  };
+
+  const handleImport = () => {
+    if (!importText.trim()) {
+      setImportMessage({ type: "error", text: "Paste JSON data first." });
+      return;
+    }
+    const result = gameStorage.importGames(importText.trim());
+    if (result.success) {
+      setSavedGames(gameStorage.getSavedGames());
+      setImportMessage({
+        type: "success",
+        text: "Games imported successfully!",
+      });
+      setImportText("");
+    } else {
+      setImportMessage({
+        type: "error",
+        text: "Invalid JSON. Check your data and try again.",
+      });
+    }
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      setImportText(text || "");
+      setImportMessage(null);
+    };
+    reader.readAsText(file);
+    // Reset so same file can be re-selected
+    e.target.value = "";
   };
 
   const formatDate = (timestamp: number) => {
@@ -90,6 +133,74 @@ export function SavedGamesModal({
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 Copy to Clipboard
+              </button>
+            </div>
+          </div>
+        ) : showImport ? (
+          <div className="p-4 md:p-6">
+            <h3 className="text-lg font-medium text-white mb-3">
+              📥 Import Games
+            </h3>
+            <p className="text-gray-400 text-sm mb-3">
+              Paste JSON data exported from this app, or upload a{" "}
+              <code className="text-xs bg-gray-700 px-1 rounded">.json</code>{" "}
+              file.
+            </p>
+
+            {/* File upload */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              onChange={handleImportFile}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="mb-3 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm w-full"
+            >
+              📂 Choose .json File
+            </button>
+
+            <textarea
+              value={importText}
+              onChange={(e) => {
+                setImportText(e.target.value);
+                setImportMessage(null);
+              }}
+              className="w-full h-48 bg-gray-700 text-white rounded p-3 text-xs font-mono resize-y"
+              placeholder='Paste JSON here, e.g. {"games":[...],"settings":{...}}'
+            />
+
+            {importMessage && (
+              <div
+                className={`mt-2 px-3 py-2 rounded text-sm ${
+                  importMessage.type === "success"
+                    ? "bg-green-900/40 text-green-300 border border-green-700"
+                    : "bg-red-900/40 text-red-300 border border-red-700"
+                }`}
+              >
+                {importMessage.type === "success" ? "✅" : "❌"}{" "}
+                {importMessage.text}
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => {
+                  setShowImport(false);
+                  setImportText("");
+                  setImportMessage(null);
+                }}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleImport}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium"
+              >
+                Import
               </button>
             </div>
           </div>
@@ -145,12 +256,23 @@ export function SavedGamesModal({
                 <h3 className="text-lg font-medium text-white">
                   💾 Saved Games ({savedGames.length})
                 </h3>
-                <button
-                  onClick={handleExportGames}
-                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                >
-                  Export All
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setShowImport(true);
+                      setImportMessage(null);
+                    }}
+                    className="px-3 py-1 bg-green-700 text-white rounded text-sm hover:bg-green-600"
+                  >
+                    📥 Import
+                  </button>
+                  <button
+                    onClick={handleExportGames}
+                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                  >
+                    📤 Export
+                  </button>
+                </div>
               </div>
 
               {savedGames.length === 0 ? (

@@ -2,8 +2,9 @@ import { useState } from "react";
 import { soundManager } from "../services/soundManager";
 import { hapticManager } from "../services/hapticManager";
 import { gameStorage } from "../services/gameStorage";
-import type { GameSettings } from "../types/chess";
+import type { BoardTheme, GameSettings } from "../types/chess";
 import { getUiDepthLimit } from "../utils/engineConstraints";
+import { BOARD_THEMES } from "../utils/boardThemes";
 
 type SettingsModalState = GameSettings & {
   soundEnabled: boolean;
@@ -77,6 +78,7 @@ export function SettingsModal({
       wdlShowAllArrowsDefault: localSettings.wdlShowAllArrowsDefault,
       autoAnalysis: localSettings.autoAnalysis,
       aiDepth: localSettings.aiDepth,
+      boardTheme: localSettings.boardTheme,
     });
 
     // Apply to game settings
@@ -95,6 +97,7 @@ export function SettingsModal({
       wdlShowAllArrowsDefault: localSettings.wdlShowAllArrowsDefault,
       autoAnalysis: localSettings.autoAnalysis,
       analysisMode: localSettings.analysisMode,
+      boardTheme: localSettings.boardTheme,
     });
     onClose();
   };
@@ -168,6 +171,59 @@ export function SettingsModal({
                     className="w-4 h-4 text-blue-600 rounded"
                   />
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Board Appearance */}
+          <div>
+            <h3 className="text-lg font-medium text-white mb-3">
+              🎨 Board Appearance
+            </h3>
+            <div className="space-y-2">
+              <label className="block text-gray-300 text-sm mb-2">
+                Board Theme
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  Object.entries(BOARD_THEMES) as [
+                    BoardTheme,
+                    (typeof BOARD_THEMES)[BoardTheme],
+                  ][]
+                ).map(([themeKey, theme]) => (
+                  <button
+                    key={themeKey}
+                    onClick={() => handleSettingChange("boardTheme", themeKey)}
+                    className={`flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all ${
+                      localSettings.boardTheme === themeKey
+                        ? "border-blue-500 bg-blue-900/30"
+                        : "border-gray-600 hover:border-gray-400"
+                    }`}
+                    title={theme.label}
+                  >
+                    {/* Mini board swatch */}
+                    <div className="grid grid-cols-4 gap-px w-12 h-6 rounded overflow-hidden">
+                      {Array.from({ length: 16 }).map((_, i) => {
+                        const row = Math.floor(i / 4);
+                        const col = i % 4;
+                        const isLight = (row + col) % 2 === 0;
+                        return (
+                          <div
+                            key={i}
+                            style={{
+                              backgroundColor: isLight
+                                ? theme.light
+                                : theme.dark,
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                    <span className="text-xs text-gray-300 text-center leading-tight">
+                      {theme.label}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>

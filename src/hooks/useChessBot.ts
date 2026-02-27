@@ -3,6 +3,7 @@ import { Chess, Square } from "chess.js";
 import { useQueryClient } from "@tanstack/react-query";
 import { StockfishAPI } from "../services/stockfishApi";
 import { ChessApiEngine } from "../services/chessApiEngine";
+import { fetchOpening, type OpeningInfo } from "../services/openingsApi";
 import { soundManager } from "../services/soundManager";
 import { hapticManager } from "../services/hapticManager";
 import { gameStorage } from "../services/gameStorage";
@@ -93,6 +94,7 @@ export const useChessBot = (
       wdlShowAllArrowsDefault: savedSettings.wdlShowAllArrowsDefault ?? true,
       autoAnalysis: savedSettings.autoAnalysis,
       analysisMode: false,
+      boardTheme: savedSettings.boardTheme || "classic",
     };
 
     if (initialGameState?.settings) {
@@ -122,6 +124,12 @@ export const useChessBot = (
     LiveAnalysisPoint[]
   >([]);
   const [loadedPgnResult, setLoadedPgnResult] = useState<string | null>(null);
+  const [currentOpening, setCurrentOpening] = useState<OpeningInfo | null>(
+    null,
+  );
+  const lastOpeningFenRef = useRef<string | null>(null);
+  // Replay mode: null = live game, number = ply index being viewed (0-based)
+  const [replayIndex, setReplayIndex] = useState<number | null>(null);
   const analysisTimeoutRef = useRef<number | null>(null);
   const analysisInFlightRef = useRef(false);
   const lastAnalyzedFenRef = useRef<string | null>(null);
@@ -140,6 +148,17 @@ export const useChessBot = (
       settings.autoAnalysis);
   const currentFen = chess.fen();
   const currentPgn = chess.pgn();
+
+  // Fetch opening name from Lichess whenever the FEN changes (first ~25 plies)
+  useEffect(() => {
+    if (lastOpeningFenRef.current === currentFen) return;
+    // Only query for the opening phase (move number <= 15 = ply <= 30)
+    if (chess.moveNumber() > 15) return;
+    lastOpeningFenRef.current = currentFen;
+    void fetchOpening(currentFen).then((info) => {
+      setCurrentOpening(info);
+    });
+  }, [chess, currentFen]);
 
   // Initialize services with saved settings
   useEffect(() => {
@@ -1810,6 +1829,65 @@ export const useChessBot = (
     setIsAiVsAiPaused(false);
   }, []);
 
+  // ────────────────────────────────────────────────────
+  // Replay helpers
+  // ────────────────────────────────────────────────────
+
+  /** Reconstruct the FEN after applying the first `plyCount` moves from history. */
+  const getFenAtPly = useCallback(
+    (plyCount: number): string => {
+      const temp = new Chess();
+      const movesToApply = moveHistory.slice(0, plyCount);
+      for (const san of movesToApply) {
+        try {
+          temp.move(san);
+        } catch {
+          break;
+        }
+      }
+      return temp.fen();
+    },
+    [moveHistory],
+  );
+
+  /** Current FEN shown in replay (or live FEN when not replaying). */
+  const replayFen = replayIndex !== null ? getFenAtPly(replayIndex) : null;
+
+  const handleReplayGoto = useCallback((plyIndex: number) => {
+    setReplayIndex(Math.max(0, plyIndex));
+  }, []);
+
+  const handleReplayExit = useCallback(() => {
+    setReplayIndex(null);
+  }, []);
+
+  const handleReplayFirst = useCallback(() => {
+    setReplayIndex(0);
+  }, []);
+
+  const handleReplayLast = useCallback(() => {
+    setReplayIndex((prev) => {
+      const last = moveHistory.length;
+      return prev === null ? last : last;
+    });
+  }, [moveHistory.length]);
+
+  const handleReplayPrev = useCallback(() => {
+    setReplayIndex((prev) => {
+      if (prev === null) return moveHistory.length - 1;
+      return Math.max(0, prev - 1);
+    });
+  }, [moveHistory.length]);
+
+  const handleReplayNext = useCallback(() => {
+    setReplayIndex((prev) => {
+      if (prev === null) return null;
+      const next = prev + 1;
+      if (next >= moveHistory.length) return null; // exit replay at last move
+      return next;
+    });
+  }, [moveHistory.length]);
+
   const handleCopyFen = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(chess.fen());
@@ -2013,6 +2091,7 @@ export const useChessBot = (
     hintMove,
     isAiVsAiPaused,
     engineNotice,
+    currentOpening,
     handleSquareClick,
     handlePieceDrop,
     handleSettingsChange,
@@ -2029,5 +2108,15 @@ export const useChessBot = (
     handleLoadPGN,
     handlePauseAiVsAi,
     handleResumeAiVsAi,
+    // Replay
+    replayIndex,
+    replayFen,
+    isReplaying: replayIndex !== null,
+    handleReplayGoto,
+    handleReplayExit,
+    handleReplayFirst,
+    handleReplayLast,
+    handleReplayPrev,
+    handleReplayNext,
   };
 };

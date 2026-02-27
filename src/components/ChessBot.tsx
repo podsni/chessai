@@ -5,6 +5,7 @@ import { FenDisplay } from "./FenDisplay";
 import { AnalysisTimelineChart } from "./AnalysisTimelineChart";
 import { MoveNotation } from "./MoveNotation";
 import { PgnLoadModal } from "./PgnLoadModal";
+import { PuzzleMode } from "./PuzzleMode";
 import { SavedGamesModal } from "./SavedGamesModal";
 import { EvaluationBar } from "./EvaluationBar";
 import { useChessBot } from "../hooks/useChessBot";
@@ -12,6 +13,11 @@ import { useState, useEffect, useMemo } from "react";
 import {
   BarChart3,
   Bot,
+  Brain,
+  ChevronFirst,
+  ChevronLast,
+  ChevronLeft,
+  ChevronRight,
   Crown,
   FileText,
   Lightbulb,
@@ -22,6 +28,7 @@ import {
   Settings,
   Smartphone,
   Target,
+  X,
 } from "lucide-react";
 import type { AIEngine, PersistedGameState } from "../types/chess";
 import { estimateWdl } from "../utils/evaluation";
@@ -45,6 +52,7 @@ export function ChessBot({
   const [showSettings, setShowSettings] = useState(false);
   const [showPgnModal, setShowPgnModal] = useState(false);
   const [showSavedGames, setShowSavedGames] = useState(false);
+  const [puzzleMode, setPuzzleMode] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [tempName, setTempName] = useState("");
   const [selectedWdlMove, setSelectedWdlMove] = useState<string | null>(null);
@@ -90,6 +98,7 @@ export function ChessBot({
     hintMove,
     isAiVsAiPaused,
     engineNotice,
+    currentOpening,
     handleSquareClick,
     handlePieceDrop,
     handleSettingsChange,
@@ -106,14 +115,24 @@ export function ChessBot({
     handleLoadPGN,
     handlePauseAiVsAi,
     handleResumeAiVsAi,
+    replayIndex,
+    replayFen,
+    isReplaying,
+    handleReplayGoto,
+    handleReplayExit,
+    handleReplayFirst,
+    handleReplayLast,
+    handleReplayPrev,
+    handleReplayNext,
   } = useChessBot(initialGameState, onGameStateChange);
 
-  // Determine if pieces should be draggable
+  // Determine if pieces should be draggable (never draggable in replay mode)
   const arePiecesDraggable =
-    settings.analysisMode ||
-    settings.mode === "human-vs-human" ||
-    (settings.mode === "human-vs-ai" &&
-      chess.turn() === settings.humanColor[0]);
+    !isReplaying &&
+    (settings.analysisMode ||
+      settings.mode === "human-vs-human" ||
+      (settings.mode === "human-vs-ai" &&
+        chess.turn() === settings.humanColor[0]));
   const wdl = estimateWdl(
     analysis?.evaluation,
     analysis?.mate,
@@ -264,6 +283,18 @@ export function ChessBot({
             </div>
             <div className="flex gap-1 md:gap-2 ml-2 md:ml-4 flex-shrink-0">
               <button
+                onClick={() => setPuzzleMode((v) => !v)}
+                className={`chess-button header-action-btn h-10 px-3 text-xs md:text-sm touch-manipulation inline-flex items-center gap-1.5 ${
+                  puzzleMode
+                    ? "bg-purple-700 text-white border-purple-500"
+                    : "secondary"
+                }`}
+                title="Puzzle Mode"
+              >
+                <Brain className="w-4 h-4" />
+                <span className="hidden sm:inline">Puzzles</span>
+              </button>
+              <button
                 onClick={() => setShowPgnModal(true)}
                 className="chess-button secondary header-action-btn h-10 px-3 text-xs md:text-sm touch-manipulation inline-flex items-center gap-1.5"
                 title="Load PGN Game"
@@ -318,31 +349,53 @@ export function ChessBot({
       )}
       {/* Main Content */}
       <main className="page-main container mx-auto px-2 py-4 md:px-4 md:py-6">
-        <div className="dashboard-layout grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        {/* Puzzle Mode */}
+        {puzzleMode && (
+          <div className="game-card p-4 md:p-6">
+            <PuzzleMode boardTheme={settings.boardTheme} />
+          </div>
+        )}
+
+        <div
+          className={`dashboard-layout grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 ${puzzleMode ? "hidden" : ""}`}
+        >
           {/* Chess Board - Takes up 2 columns on large screens */}
           <div className="lg:col-span-2 order-1 lg:order-1 min-w-0">
             <div className="game-card board-panel p-4 md:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
-                <h2 className="text-lg md:text-xl font-semibold text-white flex items-center gap-2 flex-wrap">
-                  <Target className="w-5 h-5 text-emerald-400" />
-                  <span className="hidden sm:inline">Chess Board</span>
-                  <span className="sm:hidden">Board</span>
-                  {settings.analysisMode && (
-                    <span className="status-chip status-chip-blue">
-                      ANALYSIS
-                    </span>
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-lg md:text-xl font-semibold text-white flex items-center gap-2 flex-wrap">
+                    <Target className="w-5 h-5 text-emerald-400" />
+                    <span className="hidden sm:inline">Chess Board</span>
+                    <span className="sm:hidden">Board</span>
+                    {settings.analysisMode && (
+                      <span className="status-chip status-chip-blue">
+                        ANALYSIS
+                      </span>
+                    )}
+                    {arePiecesDraggable && (
+                      <span className="status-chip status-chip-green">
+                        DRAG & DROP
+                      </span>
+                    )}
+                    {isMobile && (
+                      <span className="status-chip status-chip-purple">
+                        MOBILE
+                      </span>
+                    )}
+                  </h2>
+                  {/* Opening name badge */}
+                  {currentOpening && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-mono text-amber-400 bg-amber-900/30 border border-amber-700/50 rounded px-2 py-0.5">
+                        {currentOpening.eco}
+                      </span>
+                      <span className="text-xs text-amber-300/90">
+                        {currentOpening.name}
+                      </span>
+                    </div>
                   )}
-                  {arePiecesDraggable && (
-                    <span className="status-chip status-chip-green">
-                      DRAG & DROP
-                    </span>
-                  )}
-                  {isMobile && (
-                    <span className="status-chip status-chip-purple">
-                      MOBILE
-                    </span>
-                  )}
-                </h2>
+                </div>
                 <div
                   className="flex items-center gap-2 text-xs md:text-sm flex-wrap"
                   style={{ color: "var(--text-light)" }}
@@ -400,6 +453,8 @@ export function ChessBot({
                     humanColor={settings.humanColor}
                     aiColor={settings.aiColor}
                     gameMode={settings.mode}
+                    boardTheme={settings.boardTheme}
+                    overrideFen={replayFen}
                   />
                 </div>
               </div>
@@ -466,6 +521,65 @@ export function ChessBot({
                 </button>
               </div>
 
+              {/* Replay Controls — shown when there are moves to replay */}
+              {moveHistory.length > 0 && (
+                <div className="mt-3 flex items-center gap-2 justify-center">
+                  {isReplaying ? (
+                    <>
+                      <button
+                        onClick={handleReplayFirst}
+                        className="chess-button secondary h-9 px-2 touch-manipulation"
+                        title="First move"
+                      >
+                        <ChevronFirst className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={handleReplayPrev}
+                        className="chess-button secondary h-9 px-2 touch-manipulation"
+                        title="Previous move"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <span className="text-xs text-gray-300 px-2 min-w-[60px] text-center tabular-nums">
+                        {replayIndex ?? moveHistory.length} /{" "}
+                        {moveHistory.length}
+                      </span>
+                      <button
+                        onClick={handleReplayNext}
+                        className="chess-button secondary h-9 px-2 touch-manipulation"
+                        title="Next move"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={handleReplayLast}
+                        className="chess-button secondary h-9 px-2 touch-manipulation"
+                        title="Last move"
+                      >
+                        <ChevronLast className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={handleReplayExit}
+                        className="chess-button secondary h-9 px-3 touch-manipulation flex items-center gap-1 text-amber-400 border-amber-600/50"
+                        title="Exit replay"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span className="text-xs">Exit</span>
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={handleReplayFirst}
+                      className="chess-button secondary h-9 px-3 touch-manipulation flex items-center gap-1.5 text-xs"
+                      title="Replay game from start"
+                    >
+                      <ChevronFirst className="w-4 h-4" />
+                      <span>Replay</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Mobile Status */}
               {isMobile && (
                 <div className="mt-3 text-center">
@@ -509,6 +623,9 @@ export function ChessBot({
                 gameStatus={gameStatus}
                 gameOver={chess.isGameOver()}
                 pgnResult={loadedPgnResult}
+                onReplayGoto={
+                  moveHistory.length > 0 ? handleReplayGoto : undefined
+                }
               />
 
               {/* Analysis Display */}

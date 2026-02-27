@@ -12,6 +12,7 @@ interface AnalysisTimelineChartProps {
   gameStatus: string;
   gameOver: boolean;
   pgnResult?: string | null;
+  onReplayGoto?: (plyIndex: number) => void;
 }
 
 const qualityColor: Record<MoveQualityClass, string> = {
@@ -81,6 +82,7 @@ export function AnalysisTimelineChart({
   gameStatus,
   gameOver,
   pgnResult,
+  onReplayGoto,
 }: AnalysisTimelineChartProps) {
   const timelinePoints = timeline.slice(-80);
   const timelineIndex = timelinePoints.map((_, index) => index);
@@ -302,6 +304,11 @@ export function AnalysisTimelineChart({
                   cy={y}
                   r={index === selectedIndex ? "2.2" : "1.4"}
                   fill={qualityColor[point.quality]}
+                  style={{ cursor: onReplayGoto ? "pointer" : "default" }}
+                  onClick={() => {
+                    setSelectedIndex(index);
+                    onReplayGoto?.(point.ply);
+                  }}
                 >
                   <title>
                     {`Move ${point.moveNumber} | ${qualityLabel[point.quality]} | Δ${point.deltaCp}cp | Conf ${point.confidence}%`}

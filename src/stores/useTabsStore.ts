@@ -44,6 +44,7 @@ const defaultSettings: GameSettings = {
   wdlShowAllArrowsDefault: true,
   autoAnalysis: false,
   analysisMode: false,
+  boardTheme: "classic",
 };
 
 const createInitialGameState = (): PersistedGameState => {

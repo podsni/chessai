@@ -3,8 +3,10 @@ import { Chess, Square } from "chess.js";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   AnalysisArrow as AnalysisArrowType,
+  BoardTheme,
   WdlArrowScore,
 } from "../types/chess";
+import { BOARD_THEMES } from "../utils/boardThemes";
 
 interface ChessBoardProps {
   chess: Chess;
@@ -19,6 +21,9 @@ interface ChessBoardProps {
   humanColor?: "white" | "black";
   aiColor?: "white" | "black";
   gameMode?: string;
+  boardTheme?: BoardTheme;
+  /** When provided, display this FEN instead of chess.fen() (replay mode). */
+  overrideFen?: string | null;
 }
 
 export function ChessBoard({
@@ -34,7 +39,12 @@ export function ChessBoard({
   humanColor = "white",
   aiColor: _aiColor = "black",
   gameMode = "human-vs-ai",
+  boardTheme = "classic",
+  overrideFen,
 }: ChessBoardProps) {
+  const themeColors = BOARD_THEMES[boardTheme] ?? BOARD_THEMES.classic;
+  // Use overrideFen (replay) or the live chess position
+  const displayFen = overrideFen ?? chess.fen();
   const [boardSize, setBoardSize] = useState(400);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [lastTouchTime, setLastTouchTime] = useState(0);
@@ -274,7 +284,7 @@ export function ChessBoard({
   const chessboardOptions = useMemo(
     () => ({
       id: "chess-board",
-      position: chess.fen(),
+      position: displayFen,
       onSquareClick: ({ square }: { square: string }) =>
         handleSquareClick(square as Square),
       onPieceClick: ({
@@ -302,10 +312,10 @@ export function ChessBoard({
       allowDragOffBoard: false,
       allowDrawingArrows: false,
       darkSquareStyle: {
-        backgroundColor: "#b58863",
+        backgroundColor: themeColors.dark,
       },
       lightSquareStyle: {
-        backgroundColor: "#f0d9b5",
+        backgroundColor: themeColors.light,
       },
       darkSquareNotationStyle: {
         fontSize: notationFontSize,
@@ -331,9 +341,9 @@ export function ChessBoard({
     [
       arePiecesDraggable,
       boardSize,
-      chess,
       customArrows,
       customSquareStyles,
+      displayFen,
       handlePieceDrop,
       handleSquareClick,
       isDraggablePiece,
@@ -341,6 +351,7 @@ export function ChessBoard({
       isTouchDevice,
       mobileBoardStyle,
       notationFontSize,
+      themeColors,
     ],
   );
 

@@ -5,6 +5,13 @@ export type BoardOrientation = "white" | "black";
 export type PlayerColor = "white" | "black";
 export type AIEngine = "stockfish-online" | "chess-api";
 export type AnalysisEngineMode = "single" | "safe" | "both";
+export type BoardTheme =
+  | "classic"
+  | "blue"
+  | "green"
+  | "dark"
+  | "purple"
+  | "red";
 
 export interface GameSettings {
   mode: GameMode;
@@ -21,6 +28,7 @@ export interface GameSettings {
   wdlShowAllArrowsDefault: boolean;
   autoAnalysis: boolean;
   analysisMode: boolean;
+  boardTheme: BoardTheme;
 }
 
 export interface GameState {
